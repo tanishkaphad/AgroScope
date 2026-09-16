@@ -1,0 +1,1 @@
+"""AgroScope automated test suite."""

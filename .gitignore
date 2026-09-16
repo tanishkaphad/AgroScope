@@ -1,0 +1,78 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+.env
+.venv
+
+# Jupyter Notebooks
+.ipynb_checkpoints
+*/.ipynb_checkpoints/*
+
+# Testing & Coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# MLOps & MLflow
+mlruns/
+.mlflow/
+
+# DVC local storage & cache
+.dvc/cache
+.dvc/tmp
+
+# Large Geospatial & Raw Satellite Files (Tracked via DVC, NOT Git)
+data/raw/satellite/*
+!data/raw/satellite/.gitkeep
+!data/raw/satellite/*.dvc
+*.tif
+*.tiff
+*.jp2
+*.SAFE
+*.tar.gz
+*.zip
+
+# Processed datasets & features (Tracked via DVC, NOT Git)
+data/processed/*
+!data/processed/.gitkeep
+!data/processed/*.dvc
+data/features/*
+!data/features/.gitkeep
+!data/features/*.dvc
+
+# Model Artifacts (Tracked via DVC / MLflow)
+models/*
+!models/.gitkeep
+!models/*.dvc
+
+# Node / React Frontend
+dashboard/node_modules/
+dashboard/dist/
+dashboard/.env.local
+
+# IDE & OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

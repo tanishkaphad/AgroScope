@@ -1,0 +1,1 @@
+"""AgroScope core source package."""
