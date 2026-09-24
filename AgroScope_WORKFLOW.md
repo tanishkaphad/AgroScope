@@ -3,6 +3,8 @@
 ## Satellite-Based Crop Water Stress Estimation and Irrigation Advisory for Canal Command Areas
 ### Fully Automated MLOps & 100% Free-Tier Cloud Deployment
 
+> **"AgroScope is an end-to-end, reproducible MLOps framework. While piloted and calibrated on the Nira Left Bank Canal, the entire data-to-deployment pipeline is parameter-driven—meaning the system can be adapted and retrained for any canal command area in India simply by providing its boundary GeoJSON."**
+
 ---
 
 ## 1. Project Overview
@@ -644,6 +646,16 @@ Satellite Features + Weather Features + Crop Features + Temporal Features + Targ
                                 ↓
                       Tracked via DVC to DagsHub
 ```
+
+## Data Period Strategy
+
+| Purpose | Data Period | Source |
+|:---|:---|:---|
+| **Model Training** | Oct 2023 – Mar 2024 (Rabi Season) | Satellite + Weather (already fetched) |
+| **Model Validation** | Oct 2024 – Mar 2025 (Rabi Season) | Satellite + Weather (to be fetched later) |
+| **Live Inference** | Latest 8-day cycle (2026 onward) | Satellite + Weather (on-demand at prediction time) |
+
+> **Rationale**: The Rabi season (Oct–Mar) is the primary irrigated cropping window for the Nira Left Bank Canal command area (wheat, gram, sugarcane). It also has the lowest cloud cover in Maharashtra, giving the most complete and usable Sentinel-2 observations.
 
 ---
 
