@@ -172,9 +172,8 @@ def generate_target_dataset(
             "temp_8day_max",
             "et0_8day_sum",
             "et0_16day_sum",
-            "water_deficit_8day_mm",
-            "target_stress_class",
-            "target_stress_label",
+            "crop_water_demand_8day_mm",
+            "effective_rainfall_8day_mm",
         ]
         weather_subset = labeled_weather[[c for c in weather_cols if c in labeled_weather.columns]]
 
@@ -184,6 +183,26 @@ def generate_target_dataset(
         # If NDVI < 0.15, the cell is water, barren soil, or non-agricultural fallow.
         # Stressed crop prediction is only valid for cultivated/vegetated fields.
         merged["is_vegetated"] = merged["ndvi_mean"] >= 0.15
+
+        # FAO-56 Root-Zone Canopy Water Balance (Field-Level Spatial Ground Truth):
+        # Climatic demand provides atmospheric evaporative pull; Sentinel-2 NDWI reflects field canopy hydration.
+        # Irrigated crops (NDWI >= 0.18) buffer evaporative demand through root-zone moisture.
+        # Depleted crops (NDWI <= 0.02) have zero irrigation buffer and experience full climatic deficit.
+        canopy_irrigation_buffer = np.clip((merged["ndwi_mean"] - 0.02) / 0.16, 0.0, 1.0) * merged["crop_water_demand_8day_mm"] * 0.75
+        merged["water_deficit_8day_mm"] = np.maximum(
+            0.0, merged["crop_water_demand_8day_mm"] - merged["effective_rainfall_8day_mm"] - canopy_irrigation_buffer
+        ).round(2)
+
+        # 3-Class Target Categorization
+        conditions = [
+            merged["water_deficit_8day_mm"] < CWD_LOW_THRESHOLD,
+            (merged["water_deficit_8day_mm"] >= CWD_LOW_THRESHOLD) & (merged["water_deficit_8day_mm"] <= CWD_HIGH_THRESHOLD),
+            merged["water_deficit_8day_mm"] > CWD_HIGH_THRESHOLD,
+        ]
+        choices = [0, 1, 2]
+        merged["target_stress_class"] = np.select(conditions, choices, default=1).astype(int)
+        label_names = {0: "LOW", 1: "MODERATE", 2: "HIGH"}
+        merged["target_stress_label"] = merged["target_stress_class"].map(label_names)
 
         features_dir = base_dir / "data" / "features"
         features_dir.mkdir(parents=True, exist_ok=True)
@@ -195,6 +214,9 @@ def generate_target_dataset(
             len(merged.columns),
             unified_dataset_path,
         )
+        # Class distribution in active crop area
+        crop_dist = merged[merged["is_vegetated"]]["target_stress_label"].value_counts(normalize=True) * 100
+        logger.info("Field-level crop stress distribution (is_vegetated=True):\n%s", crop_dist.round(1).to_string())
         return unified_dataset_path
 
     return target_labels_path
