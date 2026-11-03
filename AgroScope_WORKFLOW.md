@@ -1,5 +1,7 @@
 # AgroScope — Complete Project Workflow
 
+> **Status note (2026-11-03):** this document describes the original design, and much of it isn't built. Drift monitoring, automated retraining, the database connection and support for other canals don't work yet. The reported accuracy measures how well the model reproduces a formula, not real-world performance. See [README.md](README.md) and [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) for the current state.
+
 ## Satellite-Based Crop Water Stress Estimation and Irrigation Advisory for Canal Command Areas
 ### Fully Automated MLOps & 100% Free-Tier Cloud Deployment
 

@@ -28,7 +28,8 @@ class GeoService:
         self.irrigation_map: Optional[Dict[str, Any]] = None
         self.cycle_stats: Optional[Dict[str, Any]] = None
         self.cell_lookup: Dict[str, Dict[str, Any]] = {}
-        self.available_dates: List[str] = ["2023-12-10", "2024-03-09", "2024-03-14", "2024-03-19", "2024-03-24", "2024-03-29"]
+        self.irrigation_lookup: Dict[str, Dict[str, Any]] = {}
+        self.available_dates: List[str] = []
         self._load_data()
 
     @classmethod
@@ -70,6 +71,9 @@ class GeoService:
                     cid = props.get("cell_id")
                     if cid:
                         self.cell_lookup[cid] = feat
+                self.available_dates = sorted({
+                    feat["properties"]["date"] for feat in features if feat.get("properties", {}).get("date")
+                })
                 logger.info("Indexed %d stress map cells in memory.", len(self.cell_lookup))
             except Exception as exc:
                 logger.error("Failed to load stress map GeoJSON: %s", exc)
@@ -80,26 +84,28 @@ class GeoService:
                 logger.info("Loading irrigation priority map GeoJSON from disk...")
                 with open(settings.IRRIGATION_MAP_GEOJSON, "r", encoding="utf-8") as f:
                     self.irrigation_map = json.load(f)
+                for feat in self.irrigation_map.get("features", []):
+                    cid = feat.get("properties", {}).get("cell_id")
+                    if cid:
+                        self.irrigation_lookup[cid] = feat
                 logger.info("Loaded irrigation map GeoJSON.")
             except Exception as exc:
                 logger.error("Failed to load irrigation map GeoJSON: %s", exc)
 
-    def get_study_area(self) -> Dict[str, Any]:
-        if self.study_area:
-            return self.study_area
-        return {"type": "FeatureCollection", "features": []}
+    def get_study_area(self) -> Optional[Dict[str, Any]]:
+        return self.study_area
 
     def get_available_dates(self) -> List[str]:
         return self.available_dates
 
-    def get_stress_map(self, sample: bool = True, limit: int = 1500) -> Dict[str, Any]:
+    def get_stress_map(self, sample: bool = True, limit: int = 1500) -> Optional[Dict[str, Any]]:
         """Return stress map GeoJSON.
         
         If sample=True, takes an evenly spaced sub-sample of cells to guarantee
         fast, 60fps Leaflet rendering without dropping overall spatial distribution.
         """
         if not self.stress_map:
-            return {"type": "FeatureCollection", "features": []}
+            return None
 
         features = self.stress_map.get("features", [])
         if not sample or limit <= 0 or len(features) <= limit:
@@ -119,15 +125,14 @@ class GeoService:
             "features": sampled_features,
         }
 
-    def get_irrigation_map(self, sample: bool = True, limit: int = 1500) -> Dict[str, Any]:
+    def get_irrigation_map(self, sample: bool = True, limit: int = 1500) -> Optional[Dict[str, Any]]:
         """Return irrigation map GeoJSON with priority zones."""
-        source_map = self.irrigation_map or self.stress_map
-        if not source_map:
-            return {"type": "FeatureCollection", "features": []}
+        if not self.irrigation_map:
+            return None
 
-        features = source_map.get("features", [])
+        features = self.irrigation_map.get("features", [])
         if not sample or limit <= 0 or len(features) <= limit:
-            return source_map
+            return self.irrigation_map
 
         step = max(1, len(features) // limit)
         sampled_features = features[::step][:limit]
@@ -142,41 +147,17 @@ class GeoService:
             "features": sampled_features,
         }
 
-    def get_statistics(self) -> Dict[str, Any]:
-        if self.cycle_stats:
-            return self.cycle_stats
-
-        # Fallback default calibrated for NLBC command area
-        return {
-            "cycle_date": "2023-12-10",
-            "total_culturable_cells": 22580,
-            "active_cultivated_cells": 20921,
-            "fallow_or_bare_cells": 1659,
-            "total_cultivated_hectares": 130756.2,
-            "stress_breakdown": {
-                "high_stress_hectares": 0.0,
-                "high_stress_pct": 0.0,
-                "moderate_stress_hectares": 117443.8,
-                "moderate_stress_pct": 89.8,
-                "low_stress_hectares": 13312.5,
-                "low_stress_pct": 10.2,
-            },
-            "irrigation_priority_breakdown": {
-                "priority_1_urgent_ha": 0.0,
-                "priority_1_pct": 0.0,
-                "priority_2_scheduled_ha": 117443.8,
-                "priority_2_pct": 89.8,
-                "priority_3_normal_ha": 13312.5,
-                "priority_3_pct": 10.2,
-            },
-            "mean_canopy_metrics": {
-                "mean_ndvi": 0.297,
-                "mean_ndwi": 0.058,
-            },
-        }
+    def get_statistics(self) -> Optional[Dict[str, Any]]:
+        return self.cycle_stats
 
     def get_cell_detail(self, cell_id: str) -> Optional[Dict[str, Any]]:
         return self.cell_lookup.get(cell_id)
+
+    def get_irrigation_detail(self, cell_id: str) -> Optional[Dict[str, Any]]:
+        return self.irrigation_lookup.get(cell_id)
+
+    def has_results(self) -> bool:
+        return bool(self.stress_map and self.irrigation_map and self.cycle_stats)
 
 
 geo_service = GeoService.get_instance()

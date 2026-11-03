@@ -2,7 +2,7 @@
 
 **Goal:** turn AgroScope into a tool people use daily to answer one question: *which areas need water next, and how much?* Every forecast gets checked against what the satellite later observes.
 
-**Status:** Phase 0 in progress. Last updated 2026-11-03.
+**Status:** Phase 1 done. Phase 0 needs only the DVC remote. Phase 2 is next. Last updated 2026-11-03.
 
 **Git rule:** Claude never runs git operations. The project owner runs them all.
 
@@ -56,14 +56,14 @@ Phases 4 and 6 can run in parallel once Phase 3 is done. Phase 6 needs Phase 5 o
 
 **Goal:** a clean base that anyone can run and rebuild.
 
-- [ ] Commit the untracked work: `api/`, `frontend/`, `tests/`, `supabase/`, `dvc.yaml`, `Dockerfile`, `railway.toml` and CI.
+- [x] Commit the untracked work: `api/`, `frontend/`, `tests/`, `supabase/`, `dvc.yaml`, `Dockerfile`, `railway.toml` and CI.
 - [x] Pin dependency versions, add the missing `psutil`, and move test and DVC tools to `requirements-dev.txt`.
 - [x] Add `.env.example` files, load `.env` in the API and sync script, and add a README.
 - [x] Fix `dvc.yaml`: the weather flag, missing outputs and missing dependencies, and add the `generate_labels` stage.
 - [x] Remove the hardcoded score check from `test_metrics_endpoint`.
 - [x] Skip tests that need a model or frontend build when those files are missing.
-- [ ] Initialize DVC and track `data/raw/satellite`.
-- [ ] Run `dvc repro` from raw data to model.
+- [x] Initialize DVC and track `data/raw/satellite`.
+- [x] Run `dvc repro` from raw data to model.
 - [ ] Set up a DVC remote, then make CI run `dvc pull` so the skipped tests run there.
 
 **Done when:** a fresh clone can get the data and run `dvc repro` from raw data to model, and CI passes without relying on files only you have.
@@ -72,14 +72,14 @@ Phases 4 and 6 can run in parallel once Phase 3 is done. Phase 6 needs Phase 5 o
 
 **Goal:** everything on screen is real or clearly marked as unavailable.
 
-- [ ] Remove the mock fallbacks from `frontend/src/services/api.js`.
-- [ ] Add error, empty and loading states to the frontend components.
-- [ ] Show the data date and model version wherever results appear.
-- [ ] Make `api/app/routes/inference.py` return an error or "no data" instead of invented weather, crop and soil values.
-- [ ] Make `/monitoring/drift` and `/retrain` return `501 Not Implemented` until Phase 5.
-- [ ] Read `/metrics` model scores from `models/feature_metadata.json` or the evaluation output, not from constants.
-- [ ] Remove the 99.86% claim, Evidently claims and "any canal in India" claim from the docs and slides, or mark them as planned.
-- [ ] Add tests that shut off the data source and confirm the API returns an error, not values.
+- [x] Remove the mock fallbacks from `frontend/src/services/api.js`.
+- [x] Add error, empty and loading states to the frontend components.
+- [x] Show the data date and model version wherever results appear.
+- [x] Make `api/app/routes/inference.py` return an error or "no data" instead of invented weather, crop and soil values.
+- [x] Make `/monitoring/drift` and `/retrain` return `501 Not Implemented` until Phase 5.
+- [x] Read `/metrics` model scores from `models/feature_metadata.json` or the evaluation output, not from constants.
+- [x] Remove the 99.86% claim, Evidently claims and "any canal in India" claim from the docs and slides, or mark them as planned. Done with a status note at the top of each.
+- [x] Add tests that shut off the data source and confirm the API returns an error, not values.
 
 **Done when:** with the backend off, the frontend shows a clear error and no numbers.
 
@@ -201,8 +201,7 @@ Only start these once the Nira canal version is in regular use:
 
 ## First tasks
 
-1. Commit the untracked code as a clean baseline.
-2. Add the missing `dvc.yaml` stages and confirm that `dvc repro` runs.
-3. Remove the frontend mock fallbacks.
-4. Remove invented values from `api/app/routes/inference.py`.
-5. Book the first conversations with target users.
+1. Set up the DVC remote and make CI run `dvc pull`.
+2. Replace the watermarked base map (B-26).
+3. Book the first conversations with target users.
+4. Start Phase 2 with `configs/settings.yaml`.

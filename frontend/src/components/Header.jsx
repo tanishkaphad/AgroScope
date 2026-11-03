@@ -15,7 +15,7 @@ export default function Header({
       title: 'AgroScope',
       tagline: 'Satellite Crop Water Stress & Irrigation Advisory',
       area: 'Nira Left Bank Canal Command Area (Pune)',
-      mlopsBtn: 'MLOps Drift',
+      mlopsBtn: 'Model Status',
     },
     mr: {
       title: 'ॲग्रोस्कोप',
@@ -54,9 +54,11 @@ export default function Header({
           <select
             value={cycleDate}
             onChange={(e) => onDateChange(e.target.value)}
+            disabled={availableDates.length <= 1}
             id="cycle-select-input"
             aria-label="Select satellite observation cycle"
           >
+            {availableDates.length === 0 && <option value="">No data</option>}
             {availableDates.map((d) => (
               <option key={d} value={d}>
                 Cycle: {d}
@@ -106,7 +108,7 @@ export default function Header({
         </button>
 
         {/* Live System Status Pill */}
-        <div className="status-badge" id="system-status-pill" title="Railway FastAPI & XGBoost Model Ready">
+        <div className={`status-badge ${systemStatus === 'API ONLINE' ? '' : 'problem'}`} id="system-status-pill" title="API connection status">
           <div className="pulse-dot"></div>
           <span>{systemStatus}</span>
         </div>

@@ -6,6 +6,8 @@ and parcel detail caching.
 
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
 import time
 from typing import Any, Dict, Optional
@@ -54,6 +56,21 @@ class ModelService:
 
     def is_loaded(self) -> bool:
         return self.predictor is not None and self.predictor.model is not None
+
+    def get_version(self) -> Optional[str]:
+        """Identify the loaded model by a hash of its file."""
+        if not self.is_loaded():
+            return None
+        digest = hashlib.md5(settings.MODEL_PATH.read_bytes()).hexdigest()
+        return f"xgboost-{digest[:8]}"
+
+    def get_macro_f1(self) -> Optional[float]:
+        """Read the macro F1 recorded for the model at training time."""
+        if not settings.METADATA_PATH.exists():
+            return None
+        with open(settings.METADATA_PATH, "r", encoding="utf-8") as f:
+            metadata = json.load(f)
+        return metadata.get("metrics", {}).get("xgboost", {}).get("macro_f1")
 
 
 model_service = ModelService.get_instance()

@@ -11,9 +11,12 @@ export default function PredictionStudio({ currentLang = 'en', initialValues = n
 
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
+  const [error, setError] = useState(null);
 
   const handleRunInference = async () => {
     setLoading(true);
+    setError(null);
+    setResult(null);
     const payload = {
       ndvi_mean: parseFloat(ndvi),
       ndwi_mean: parseFloat(ndwi),
@@ -23,9 +26,13 @@ export default function PredictionStudio({ currentLang = 'en', initialValues = n
       lang: currentLang,
     };
 
-    const res = await runPredict(payload);
-    setResult(res);
-    setLoading(false);
+    try {
+      setResult(await runPredict(payload));
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleReset = () => {
@@ -35,6 +42,7 @@ export default function PredictionStudio({ currentLang = 'en', initialValues = n
     setRainfall(0.0);
     setEt0(36.0);
     setResult(null);
+    setError(null);
   };
 
   return (
@@ -136,8 +144,14 @@ export default function PredictionStudio({ currentLang = 'en', initialValues = n
         id="run-simulation-btn"
       >
         <Zap size={16} />
-        <span>{loading ? 'Evaluating Model...' : 'Run AI Stress Inference'}</span>
+        <span>{loading ? 'Evaluating Model...' : 'Run Simulation'}</span>
       </button>
+
+      {error && (
+        <div className="data-error-banner" role="alert" style={{ margin: '1rem 0 0' }}>
+          <span>{error}</span>
+        </div>
+      )}
 
       {/* Inference Result Box */}
       {result && (
@@ -146,7 +160,7 @@ export default function PredictionStudio({ currentLang = 'en', initialValues = n
             <div className="parcel-id-row">
               <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#fff' }}>SIMULATED PREDICTION</span>
               <span className={`stress-badge-pill ${result.predicted_class?.toLowerCase()}`}>
-                {result.predicted_class} ({Math.round((result.confidence || 0.98) * 100)}%)
+                {result.predicted_class} ({Math.round(result.confidence * 100)}%)
               </span>
             </div>
             <div style={{ fontSize: '0.78rem', marginTop: '0.35rem', color: result.advisory?.color, fontWeight: 700 }}>
@@ -154,6 +168,9 @@ export default function PredictionStudio({ currentLang = 'en', initialValues = n
             </div>
             <div style={{ fontSize: '0.75rem', marginTop: '0.25rem', color: 'var(--text-secondary)' }}>
               {result.advisory?.recommendation}
+            </div>
+            <div style={{ fontSize: '0.72rem', marginTop: '0.5rem', color: 'var(--text-muted)' }}>
+              {result.note}
             </div>
           </div>
         </div>

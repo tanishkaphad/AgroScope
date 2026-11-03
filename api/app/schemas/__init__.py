@@ -7,7 +7,6 @@ from api.app.schemas.schemas import (
     PredictRequest,
     PredictResponse,
     StatisticsResponse,
-    DriftCheckResponse,
 )
 
 __all__ = [
@@ -19,5 +18,4 @@ __all__ = [
     "PredictRequest",
     "PredictResponse",
     "StatisticsResponse",
-    "DriftCheckResponse",
 ]

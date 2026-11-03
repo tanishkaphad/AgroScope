@@ -10,15 +10,16 @@ class HealthResponse(BaseModel):
     status: str = Field(..., example="HEALTHY")
     database: str = Field(..., example="CONNECTED")
     model: str = Field(..., example="LOADED")
-    model_version: str = Field(..., example="XGBoost v1.0 (NLBC Calibrated)")
+    model_version: Optional[str] = Field(None, example="xgboost-1a2b3c4d")
     timestamp: str
 
 
 class MetricsResponse(BaseModel):
     uptime_seconds: float
     total_inferences: int
-    active_model: str
-    macro_f1_score: float
+    active_model: Optional[str] = None
+    macro_f1_score: Optional[float] = None
+    score_note: str
     memory_rss_mb: float
     timestamp: str
 
@@ -46,8 +47,8 @@ class AdvisoryResponse(BaseModel):
 class AreaDetailResponse(BaseModel):
     cell_id: str
     date: str
-    crop_type: str = "Command Area Crop"
-    dominant_soil: str = "Vertisols (Black Cotton Soil)"
+    crop_type: Optional[str] = None
+    dominant_soil: Optional[str] = None
     water_stress: Dict[str, Any]
     irrigation_advisory: AdvisoryResponse
     key_drivers: List[KeyDriver]
@@ -76,6 +77,7 @@ class PredictResponse(BaseModel):
     class_probabilities: Dict[str, float]
     advisory: AdvisoryResponse
     key_drivers: List[KeyDriver]
+    note: str
 
 
 class StatisticsResponse(BaseModel):
@@ -87,15 +89,3 @@ class StatisticsResponse(BaseModel):
     stress_breakdown: Dict[str, Any]
     irrigation_priority_breakdown: Dict[str, Any]
     mean_canopy_metrics: Dict[str, float]
-
-
-class DriftCheckResponse(BaseModel):
-    eval_date: str
-    dataset_version: str
-    model_version: str
-    data_drift_detected: bool
-    prediction_drift_detected: bool
-    ks_test_pvalue: float
-    wasserstein_distance: float
-    monitored_features: List[Dict[str, Any]]
-    status: str

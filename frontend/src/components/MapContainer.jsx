@@ -6,6 +6,7 @@ export default function MapContainer({
   studyAreaGeoJson,
   stressMapGeoJson,
   irrigationMapGeoJson,
+  stats,
   activeLayer = 'stress',
   onLayerChange,
   onSelectParcel,
@@ -13,6 +14,10 @@ export default function MapContainer({
   currentLang = 'en',
 }) {
   const mapRef = useRef(null);
+  const stress = stats?.stress_breakdown;
+  const legendValue = (pct, hectares) => (
+    stress ? `${pct}% (${Math.round(hectares).toLocaleString()} ha)` : 'No data'
+  );
   const mapInstanceRef = useRef(null);
   const boundaryLayerRef = useRef(null);
   const dataLayerRef = useRef(null);
@@ -132,7 +137,7 @@ export default function MapContainer({
       map.removeLayer(dataLayerRef.current);
     }
 
-    const geoData = activeLayer === 'stress' ? stressMapGeoJson : (irrigationMapGeoJson || stressMapGeoJson);
+    const geoData = activeLayer === 'stress' ? stressMapGeoJson : irrigationMapGeoJson;
     if (!geoData || !geoData.features || geoData.features.length === 0) return;
 
     try {
@@ -189,7 +194,7 @@ export default function MapContainer({
               <strong style="color: #00f2fe; font-size: 13px;">${cid}</strong><br/>
               <span>Stress: <strong>${stressClass}</strong></span><br/>
               <span>NDVI: ${ndvi} | NDWI: ${ndwi}</span><br/>
-              <span style="color: #94a3b8; font-size: 11px;">Click polygon for SHAP XAI breakdown</span>
+              <span style="color: #94a3b8; font-size: 11px;">Click for details</span>
             </div>
           `);
         },
@@ -285,21 +290,21 @@ export default function MapContainer({
                 <span className="chip-color green"></span>
                 <span>Low Stress</span>
               </div>
-              <span style={{ color: 'var(--text-muted)' }}>10.2% (13k ha)</span>
+              <span style={{ color: 'var(--text-muted)' }}>{legendValue(stress?.low_stress_pct, stress?.low_stress_hectares)}</span>
             </div>
             <div className="legend-row">
               <div className="legend-chip">
                 <span className="chip-color yellow"></span>
                 <span>Moderate Stress</span>
               </div>
-              <span style={{ color: 'var(--text-muted)' }}>89.8% (117k ha)</span>
+              <span style={{ color: 'var(--text-muted)' }}>{legendValue(stress?.moderate_stress_pct, stress?.moderate_stress_hectares)}</span>
             </div>
             <div className="legend-row">
               <div className="legend-chip">
                 <span className="chip-color red"></span>
                 <span>High Stress</span>
               </div>
-              <span style={{ color: 'var(--text-muted)' }}>0.0% (0 ha)</span>
+              <span style={{ color: 'var(--text-muted)' }}>{legendValue(stress?.high_stress_pct, stress?.high_stress_hectares)}</span>
             </div>
           </>
         ) : (

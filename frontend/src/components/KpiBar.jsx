@@ -45,16 +45,16 @@ export default function KpiBar({ stats, currentLang = 'en' }) {
   const priority = stats.irrigation_priority_breakdown || {};
   const canopy = stats.mean_canopy_metrics || {};
 
-  const totalHa = Number(stats.total_cultivated_hectares || 130756.2).toLocaleString(undefined, { maximumFractionDigits: 1 });
+  const totalHa = Number(stats.total_cultivated_hectares || 0).toLocaleString(undefined, { maximumFractionDigits: 1 });
   const highHa = Number(stress.high_stress_hectares || 0).toLocaleString(undefined, { maximumFractionDigits: 1 });
   const highPct = stress.high_stress_pct ?? 0.0;
 
-  const modHa = Number(stress.moderate_stress_hectares || 117443.8).toLocaleString(undefined, { maximumFractionDigits: 1 });
-  const modPct = stress.moderate_stress_pct ?? 89.8;
+  const modHa = Number(stress.moderate_stress_hectares || 0).toLocaleString(undefined, { maximumFractionDigits: 1 });
+  const modPct = stress.moderate_stress_pct ?? 0;
 
   const p1Ha = Number(priority.priority_1_urgent_ha || 0).toLocaleString(undefined, { maximumFractionDigits: 1 });
-  const meanNdvi = canopy.mean_ndvi ?? 0.297;
-  const meanNdwi = canopy.mean_ndwi ?? 0.058;
+  const meanNdvi = canopy.mean_ndvi ?? 0;
+  const meanNdwi = canopy.mean_ndwi ?? 0;
 
   return (
     <section className="kpi-section" id="kpi-metrics-bar">
@@ -104,7 +104,7 @@ export default function KpiBar({ stats, currentLang = 'en' }) {
             <span className="kpi-unit">ha ({modPct}%)</span>
           </div>
           <div className="kpi-subtext">
-            {t.statusMon} • Post-monsoon canopy cycle
+            {t.statusMon}
           </div>
         </div>
 

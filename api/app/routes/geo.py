@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from typing import List, Optional
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import JSONResponse
 from api.app.services.geo_service import geo_service
 from api.app.services.metrics_service import metrics_service
@@ -15,7 +15,10 @@ router = APIRouter(tags=["Geospatial Layers"])
 async def get_study_area_boundary():
     """Retrieve official polygon boundary of the canal command area."""
     metrics_service.increment_request()
-    return geo_service.get_study_area()
+    data = geo_service.get_study_area()
+    if data is None:
+        raise HTTPException(status_code=503, detail="Study area boundary is not available.")
+    return data
 
 
 @router.get("/available-dates", response_model=List[str])
@@ -33,7 +36,11 @@ async def get_water_stress_map(
 ):
     """Retrieve GeoJSON FeatureCollection of water stress predictions."""
     metrics_service.increment_request()
+    if date and date not in geo_service.get_available_dates():
+        raise HTTPException(status_code=404, detail=f"No stress map available for {date}.")
     data = geo_service.get_stress_map(sample=sample, limit=limit)
+    if data is None:
+        raise HTTPException(status_code=503, detail="Stress map results are not available.")
     return JSONResponse(content=data)
 
 
@@ -45,4 +52,6 @@ async def get_irrigation_priority_map(
     """Retrieve GeoJSON FeatureCollection of irrigation priority zones (P1, P2, P3)."""
     metrics_service.increment_request()
     data = geo_service.get_irrigation_map(sample=sample, limit=limit)
+    if data is None:
+        raise HTTPException(status_code=503, detail="Irrigation map results are not available.")
     return JSONResponse(content=data)

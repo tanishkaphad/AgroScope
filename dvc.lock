@@ -1,0 +1,140 @@
+schema: '2.0'
+stages:
+  acquire_weather:
+    cmd: python src/ingestion/fetch_weather.py --geojson 
+      data/raw/study_area/command_area.geojson
+    deps:
+    - path: data/raw/study_area/command_area.geojson
+      hash: md5
+      md5: 26730ef4c334de04b89bf9295e79eb64
+      size: 3031
+    - path: src/ingestion/fetch_weather.py
+      hash: md5
+      md5: 9ae9e3090775e8b22de96a486a3bb746
+      size: 8662
+    outs:
+    - path: data/raw/weather/daily_weather.csv
+      hash: md5
+      md5: cf6655d0c15bdda14980cda123f48228
+      size: 68358
+  preprocess_satellite:
+    cmd: python src/preprocessing/preprocess_bands.py
+    deps:
+    - path: data/raw/satellite
+      hash: md5
+      md5: 9eb5b3efaaf47cfa4ac303eaedc6b159.dir
+      size: 10464320788
+      nfiles: 429
+    - path: data/raw/study_area/command_area.geojson
+      hash: md5
+      md5: 26730ef4c334de04b89bf9295e79eb64
+      size: 3031
+    - path: src/preprocessing/preprocess_bands.py
+      hash: md5
+      md5: 1a848bda8de3dc2e09fadbc24fbe36ba
+      size: 19017
+    outs:
+    - path: data/processed/satellite_grid_features.csv
+      hash: md5
+      md5: 70f740ce5ad2a11ce15d9f8a7c365e91
+      size: 114738717
+    - path: data/processed/spatial_grid_250m.geojson
+      hash: md5
+      md5: cd0421d94562cbca2699816601559e53
+      size: 18635716
+  generate_labels:
+    cmd: python src/target/generate_labels.py
+    deps:
+    - path: data/processed/satellite_grid_features.csv
+      hash: md5
+      md5: 70f740ce5ad2a11ce15d9f8a7c365e91
+      size: 114738717
+    - path: data/raw/weather/daily_weather.csv
+      hash: md5
+      md5: cf6655d0c15bdda14980cda123f48228
+      size: 68358
+    - path: src/target/generate_labels.py
+      hash: md5
+      md5: 44f3961218f4b401a8967cf49aa87cab
+      size: 9440
+    outs:
+    - path: data/features/features.csv
+      hash: md5
+      md5: 083ac4ebe2f5d3171ed2664102837e4d
+      size: 165728762
+    - path: data/processed/target_labels.csv
+      hash: md5
+      md5: dd4bd265f857deb48ab487b1b65daa29
+      size: 80724
+  train_evaluate:
+    cmd: python src/training/train.py
+    deps:
+    - path: data/features/features.csv
+      hash: md5
+      md5: 083ac4ebe2f5d3171ed2664102837e4d
+      size: 165728762
+    - path: src/training/train.py
+      hash: md5
+      md5: 890b61e0f729fd114f7f3d9978310de0
+      size: 17689
+    outs:
+    - path: models/baseline_random_forest.pkl
+      hash: md5
+      md5: 7dbfb12f98897efd494dc29899dd2b64
+      size: 13634317
+    - path: models/feature_metadata.json
+      hash: md5
+      md5: a5d06da061c10025050ab71c0fea3c53
+      size: 4728
+    - path: models/xgboost_model.json
+      hash: md5
+      md5: 3c4b6a753e7e1c5a2aeadd76a920a2bc
+      size: 1772912
+    - path: models/xgboost_model.pkl
+      hash: md5
+      md5: 28b6b695cfed277b254725367a00d385
+      size: 1240668
+  predict_cycle:
+    cmd: python src/inference/predict.py
+    deps:
+    - path: data/features/features.csv
+      hash: md5
+      md5: 083ac4ebe2f5d3171ed2664102837e4d
+      size: 165728762
+    - path: data/processed/spatial_grid_250m.geojson
+      hash: md5
+      md5: cd0421d94562cbca2699816601559e53
+      size: 18635716
+    - path: models/feature_metadata.json
+      hash: md5
+      md5: a5d06da061c10025050ab71c0fea3c53
+      size: 4728
+    - path: models/xgboost_model.pkl
+      hash: md5
+      md5: 28b6b695cfed277b254725367a00d385
+      size: 1240668
+    - path: src/advisory/advisory_engine.py
+      hash: md5
+      md5: 58ab0c08f541aad5f766d24cbcb07d87
+      size: 16632
+    - path: src/inference/explainability.py
+      hash: md5
+      md5: f1e9a6ef66b5f879681a660855e3731e
+      size: 10723
+    - path: src/inference/predict.py
+      hash: md5
+      md5: 88bc40d94941091fdd8bf11dee7f8f8b
+      size: 20659
+    outs:
+    - path: data/processed/cycle_statistics.json
+      hash: md5
+      md5: 3e47630ac5d95ff3b95d8c7218b25f82
+      size: 734
+    - path: data/processed/irrigation_map.geojson
+      hash: md5
+      md5: a771f2d99b21eab38e4a428d02a044cd
+      size: 79631373
+    - path: data/processed/stress_map.geojson
+      hash: md5
+      md5: e047cd7c7ad02efc36c8c399d8919d3e
+      size: 6159930

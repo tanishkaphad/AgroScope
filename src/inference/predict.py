@@ -39,6 +39,7 @@ logging.basicConfig(
 logger = logging.getLogger("agroscope.inference")
 
 CELL_AREA_HECTARES = 6.25  # 250m x 250m = 62,500 m² = 6.25 ha
+MIN_LATEST_COVERAGE = 0.9  # "latest" skips dates where a partial scene covers less of the grid
 
 
 class AgroScopePredictor:
@@ -117,8 +118,10 @@ class AgroScopePredictor:
             raise ValueError("No observation dates found in features dataset.")
 
         if date_str is None or date_str == "latest":
-            target_date = available_dates[-1]
-            logger.info("Selecting latest available cycle date: %s", target_date)
+            cells_per_date = df.groupby("date")["cell_id"].nunique()
+            covered_dates = cells_per_date[cells_per_date >= cells_per_date.max() * MIN_LATEST_COVERAGE].index
+            target_date = max(covered_dates)
+            logger.info("Selecting latest cycle date with full coverage: %s", target_date)
         else:
             if date_str not in available_dates:
                 raise ValueError(f"Date '{date_str}' not in dataset. Available dates: {available_dates}")

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { AlertTriangle } from 'lucide-react';
 import Header from './components/Header';
 import KpiBar from './components/KpiBar';
 import MapContainer from './components/MapContainer';
@@ -6,24 +7,17 @@ import ParcelInspector from './components/ParcelInspector';
 import PredictionStudio from './components/PredictionStudio';
 import MlopsModal from './components/MlopsModal';
 import {
+  fetchAvailableDates,
   fetchHealth,
   fetchStatistics,
   fetchStudyArea,
   fetchStressMap,
   fetchIrrigationMap,
-  fetchDriftReport,
 } from './services/api';
 
 export default function App() {
-  const [cycleDate, setCycleDate] = useState('2023-12-10');
-  const availableDates = [
-    '2023-12-10',
-    '2024-03-09',
-    '2024-03-14',
-    '2024-03-19',
-    '2024-03-24',
-    '2024-03-29',
-  ];
+  const [cycleDate, setCycleDate] = useState('');
+  const [availableDates, setAvailableDates] = useState([]);
 
   const [currentLang, setCurrentLang] = useState('en');
   const [activeLayer, setActiveLayer] = useState('stress'); // 'stress' | 'priority'
@@ -33,24 +27,32 @@ export default function App() {
   const [studyArea, setStudyArea] = useState(null);
   const [stressMap, setStressMap] = useState(null);
   const [irrigationMap, setIrrigationMap] = useState(null);
-  const [driftReport, setDriftReport] = useState(null);
+  const [loadErrors, setLoadErrors] = useState([]);
 
   const [selectedParcel, setSelectedParcel] = useState(null);
   const [isMlopsOpen, setIsMlopsOpen] = useState(false);
-  const [systemStatus, setSystemStatus] = useState('CONNECTED');
+  const [systemStatus, setSystemStatus] = useState('CONNECTING');
 
   // Load Initial Datasets
   useEffect(() => {
-    fetchHealth().then((h) => {
-      if (h.status === 'HEALTHY') setSystemStatus('API ONLINE');
-      else setSystemStatus('LOCAL READY');
-    });
+    const reportError = (err) => {
+      setLoadErrors((errors) => (errors.includes(err.message) ? errors : [...errors, err.message]));
+    };
 
-    fetchStatistics().then(setStats);
-    fetchStudyArea().then(setStudyArea);
-    fetchStressMap(1500).then(setStressMap);
-    fetchIrrigationMap(1500).then(setIrrigationMap);
-    fetchDriftReport().then(setDriftReport);
+    fetchHealth()
+      .then((h) => setSystemStatus(h.status === 'HEALTHY' ? 'API ONLINE' : 'API DEGRADED'))
+      .catch(() => setSystemStatus('API OFFLINE'));
+
+    fetchAvailableDates()
+      .then((dates) => {
+        setAvailableDates(dates);
+        setCycleDate(dates[dates.length - 1] ?? '');
+      })
+      .catch(reportError);
+    fetchStatistics().then(setStats).catch(reportError);
+    fetchStudyArea().then(setStudyArea).catch(reportError);
+    fetchStressMap(1500).then(setStressMap).catch(reportError);
+    fetchIrrigationMap(1500).then(setIrrigationMap).catch(reportError);
   }, []);
 
   const handleSelectParcel = (parcelData) => {
@@ -76,6 +78,13 @@ export default function App() {
         systemStatus={systemStatus}
       />
 
+      {loadErrors.length > 0 && (
+        <div className="data-error-banner" role="alert" id="data-error-banner">
+          <AlertTriangle size={16} />
+          <span>Some data couldn't be loaded: {loadErrors.join(' ')}</span>
+        </div>
+      )}
+
       {/* KPI Overview Metrics */}
       <KpiBar stats={stats} currentLang={currentLang} />
 
@@ -86,6 +95,7 @@ export default function App() {
           studyAreaGeoJson={studyArea}
           stressMapGeoJson={stressMap}
           irrigationMapGeoJson={irrigationMap}
+          stats={stats}
           activeLayer={activeLayer}
           onLayerChange={setActiveLayer}
           onSelectParcel={handleSelectParcel}
@@ -136,7 +146,6 @@ export default function App() {
       <MlopsModal
         isOpen={isMlopsOpen}
         onClose={() => setIsMlopsOpen(false)}
-        driftData={driftReport}
       />
     </div>
   );

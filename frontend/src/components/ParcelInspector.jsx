@@ -9,6 +9,7 @@ export default function ParcelInspector({
 }) {
   const [detail, setDetail] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     if (!selectedParcel || !selectedParcel.cell_id) {
@@ -18,13 +19,21 @@ export default function ParcelInspector({
 
     let isMounted = true;
     setLoading(true);
+    setError(null);
 
-    fetchParcelDetail(selectedParcel.cell_id, currentLang).then((res) => {
-      if (isMounted) {
-        setDetail(res);
-        setLoading(false);
-      }
-    });
+    fetchParcelDetail(selectedParcel.cell_id, currentLang)
+      .then((res) => {
+        if (isMounted) setDetail(res);
+      })
+      .catch((err) => {
+        if (isMounted) {
+          setDetail(null);
+          setError(err.message);
+        }
+      })
+      .finally(() => {
+        if (isMounted) setLoading(false);
+      });
 
     return () => {
       isMounted = false;
@@ -44,32 +53,37 @@ export default function ParcelInspector({
           <div className="inspector-empty-icon">🛰️</div>
           <p style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>No Parcel Selected</p>
           <p style={{ fontSize: '0.78rem', marginTop: '0.4rem', lineHeight: 1.4 }}>
-            Click any 250m agricultural grid cell on the map to inspect real-time AI water stress, SHAP drivers, and irrigation advisories.
+            Click a 250m grid cell on the map to see its water stress estimate and irrigation advice.
           </p>
         </div>
       </div>
     );
   }
 
-  const stressClass = detail?.water_stress?.class || selectedParcel.stress_class || 'MODERATE';
-  const confidence = detail?.water_stress?.confidence || selectedParcel.confidence || 0.99;
-  const advisory = detail?.irrigation_advisory || {
-    priority: selectedParcel.priority || 2,
-    urgency: selectedParcel.urgency || 'Schedule Within 3-5 Days',
-    title: selectedParcel.title || 'Moderate Water Stress Observed',
-    recommendation: selectedParcel.recommendation || 'Crop is experiencing water deficit under moderate temperatures. Plan irrigation in upcoming canal rotation.',
-    actionable_steps: selectedParcel.actionable_steps || [
-      'Confirm your turn in the next canal water distribution roster',
-      'Prepare field channels and furrows for delivery',
-    ],
-  };
+  if (loading || error || !detail) {
+    return (
+      <div className="sidebar-card" id="parcel-inspector-card">
+        <div className="card-title-group">
+          <h2>
+            <MapPin size={17} color="var(--brand-cyan)" />
+            <span>Parcel Inspector</span>
+          </h2>
+        </div>
+        <div className="inspector-empty" role={error ? 'alert' : undefined}>
+          <p style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>
+            {error ? "Couldn't load this parcel" : 'Loading parcel...'}
+          </p>
+          {error && <p style={{ fontSize: '0.78rem', marginTop: '0.4rem', lineHeight: 1.4 }}>{error}</p>}
+        </div>
+      </div>
+    );
+  }
 
-  const keyDrivers = detail?.key_drivers || [
-    { feature: 'ndwi_mean', label: 'Canopy Leaf Water Content', value: selectedParcel.ndwi || 0.04, impact_pct: 38.0, direction: 'increases_stress', arrow: '↓' },
-    { feature: 'rainfall_8day', label: '8-Day Cumulative Rainfall', value: 0.0, impact_pct: 26.5, direction: 'increases_stress', arrow: '↓' },
-    { feature: 'temp_max_c', label: 'Peak Daily Temperature', value: 34.0, impact_pct: 20.1, direction: 'increases_stress', arrow: '↑' },
-    { feature: 'ndvi_mean', label: 'Vegetation Canopy Vigor', value: selectedParcel.ndvi || 0.28, impact_pct: 15.4, direction: 'mitigates_stress', arrow: '↑' },
-  ];
+  const stressClass = detail.water_stress.class;
+  const confidence = detail.water_stress.confidence;
+  const advisory = detail.irrigation_advisory;
+  const keyDrivers = detail.key_drivers;
+  const { ndvi, ndwi } = detail.canopy_indices;
 
   const pClass = advisory.priority === 1 ? 'p1' : advisory.priority === 3 ? 'p3' : 'p2';
 
@@ -103,8 +117,8 @@ export default function ParcelInspector({
           </span>
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.74rem', color: 'var(--text-muted)' }}>
-          <span>Crop: Sugarcane / Wheat</span>
-          <span>NDVI: {selectedParcel.ndvi?.toFixed(2) || '0.28'} | NDWI: {selectedParcel.ndwi?.toFixed(2) || '0.04'}</span>
+          <span>Crop: {detail.crop_type ?? 'Not available'} | Date: {detail.date}</span>
+          <span>NDVI: {ndvi.toFixed(2)} | NDWI: {ndwi.toFixed(2)}</span>
         </div>
       </div>
 
@@ -135,6 +149,10 @@ export default function ParcelInspector({
           <Sparkles size={13} color="var(--brand-cyan)" />
           <span>SHAP Key Stress Drivers</span>
         </div>
+
+        {keyDrivers.length === 0 && (
+          <p style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>Not available for stored results yet.</p>
+        )}
 
         {keyDrivers.map((driver, idx) => (
           <div key={idx} className="shap-driver-row">

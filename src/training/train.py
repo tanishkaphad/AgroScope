@@ -348,7 +348,7 @@ def run_training_pipeline(
         f"- **Method:** {split_desc}",
         f"- **Train Observations:** `{len(X_train):,}`",
         f"- **Holdout Test Observations:** `{len(X_test):,}`",
-        "- **Data Leakage Safeguard:** Spatial Group / Block partitioning guarantees unseen fields in test evaluation; ground truth deficit features excluded from input space.",
+        "- **Known Limitation:** Labels are calculated from `ndwi_mean`, `rainfall_8day` and `et0_8day_sum`, which are also model inputs. These scores show how well the model reproduces that formula, not real-world accuracy.",
         "",
         "---",
         "",

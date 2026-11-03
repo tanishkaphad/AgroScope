@@ -2,7 +2,7 @@
 
 Satellite and weather-based crop water stress estimates and irrigation advice for the Nira Left Bank Canal in Maharashtra, India.
 
-**Status:** early development. The data is from one past season (Oct 2023 to Mar 2024), the stress labels are calculated from a formula rather than field measurements, and some API and dashboard features are placeholders. See [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) for the roadmap.
+**Status:** early development. The data is from one past season (Oct 2023 to Mar 2024), the stress labels are calculated from a formula rather than field measurements, and drift monitoring and retraining aren't built yet. See [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) for the roadmap.
 
 ## Requirements
 
@@ -24,7 +24,7 @@ Copy-Item .env.example .env
 
 ## Run the API
 
-The API needs model and map files in `models/` and `data/processed/`. Get them with `dvc pull` if a remote is set up, or build them with `dvc repro`.
+The API needs model and map files in `models/` and `data/processed/`. Get them with `dvc pull` if a remote is set up, or build them with `dvc repro`. Without them, data endpoints return 503.
 
 ```powershell
 uvicorn api.app.main:app --reload
@@ -71,4 +71,4 @@ python src/ingestion/fetch_satellite.py --start-date 2023-10-01 --end-date 2024-
 pytest tests/test_api.py -v
 ```
 
-Tests that need a trained model or a frontend build are skipped when those files are missing.
+Tests that need a trained model, prediction results or a frontend build are skipped when those files are missing.
