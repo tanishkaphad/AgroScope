@@ -77,3 +77,9 @@ dashboard/.env.local
 .agents/
 .DS_Store
 Thumbs.db
+
+# Local notes and tooling
+PROJECT_ROAST.md
+/rules/
+/improve-codebase-architecture/
+/thermo-nuclear-code-quality-review/

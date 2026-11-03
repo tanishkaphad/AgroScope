@@ -88,15 +88,16 @@ class ModelExplainer:
         self._init_shap_explainer()
 
     def _init_shap_explainer(self) -> None:
-        """Initialize SHAP TreeExplainer if shap is installed."""
+        """Initialize SHAP TreeExplainer if supported by model parameters."""
         try:
             import shap
             self._explainer = shap.TreeExplainer(self.model)
             logger.info("SHAP TreeExplainer initialized successfully.")
-        except ImportError:
+        except Exception as exc:
             logger.warning(
-                "SHAP library is not installed in the environment. "
-                "Local explainability will utilize model gain/feature-deviation fallback until 'pip install shap' is run."
+                "SHAP TreeExplainer initialization skipped (%s). "
+                "Local explainability will utilize model gain/feature-deviation fallback.",
+                exc
             )
             self._explainer = None
 

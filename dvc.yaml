@@ -1,0 +1,56 @@
+# Satellite downloads are not a stage: src/ingestion/fetch_satellite.py takes a
+# date range and fetches many GB, so data/raw/satellite is tracked with `dvc add`.
+stages:
+  acquire_weather:
+    cmd: python src/ingestion/fetch_weather.py --geojson data/raw/study_area/command_area.geojson
+    deps:
+      - src/ingestion/fetch_weather.py
+      - data/raw/study_area/command_area.geojson
+    outs:
+      - data/raw/weather/daily_weather.csv
+
+  preprocess_satellite:
+    cmd: python src/preprocessing/preprocess_bands.py
+    deps:
+      - src/preprocessing/preprocess_bands.py
+      - data/raw/study_area/command_area.geojson
+      - data/raw/satellite
+    outs:
+      - data/processed/spatial_grid_250m.geojson
+      - data/processed/satellite_grid_features.csv
+
+  generate_labels:
+    cmd: python src/target/generate_labels.py
+    deps:
+      - src/target/generate_labels.py
+      - data/raw/weather/daily_weather.csv
+      - data/processed/satellite_grid_features.csv
+    outs:
+      - data/processed/target_labels.csv
+      - data/features/features.csv
+
+  train_evaluate:
+    cmd: python src/training/train.py
+    deps:
+      - src/training/train.py
+      - data/features/features.csv
+    outs:
+      - models/xgboost_model.pkl
+      - models/xgboost_model.json
+      - models/baseline_random_forest.pkl
+      - models/feature_metadata.json
+
+  predict_cycle:
+    cmd: python src/inference/predict.py
+    deps:
+      - src/inference/predict.py
+      - src/inference/explainability.py
+      - src/advisory/advisory_engine.py
+      - models/xgboost_model.pkl
+      - models/feature_metadata.json
+      - data/features/features.csv
+      - data/processed/spatial_grid_250m.geojson
+    outs:
+      - data/processed/stress_map.geojson
+      - data/processed/irrigation_map.geojson
+      - data/processed/cycle_statistics.json
