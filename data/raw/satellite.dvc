@@ -1,0 +1,6 @@
+outs:
+- md5: 9eb5b3efaaf47cfa4ac303eaedc6b159.dir
+  size: 10464320788
+  nfiles: 429
+  hash: md5
+  path: satellite
