@@ -2,7 +2,7 @@
 
 How we'll meet the MLOps course rubric in the 2 days left from 2026-11-04. The long-term product roadmap is in [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md), and pauses until this is done.
 
-**Status:** all sections done. Your remaining steps are a GitHub Actions screenshot, `dvc status -c`, the final commit, and practising the demo and viva.
+**Status:** all sections done, and CI passes on the final code. Your remaining steps are one small commit, and practising the demo and viva.
 
 **Rules:** Claude runs no git commands, and every service stays free.
 
@@ -141,14 +141,14 @@ How we'll meet the MLOps course rubric in the 2 days left from 2026-11-04. The l
 
 | Item | Evidence | Status |
 | :--- | :--- | :--- |
-| GitHub repository | Commit history | Final commit to run |
+| GitHub repository | Commit history | Pushed, with one small evidence commit left |
 | README | Architecture and one-command setup | Done |
-| DVC | `dvc.lock`, `docs/screenshots/dvc_dag.txt`, `dvc_status.txt` | Done, except `dvc status -c`, which needs your Drive sign-in |
+| DVC | `dvc.lock`, `docs/screenshots/dvc_dag.txt`, `dvc_status.txt`, `dvc_status_cloud.txt` | Done |
 | MLflow | `mlflow_runs.png`, `mlflow_registry.png` | Done |
 | Airflow | `airflow/dags/agroscope_pipeline.py`, `airflow_dag_success.jpg` | Done |
 | FastAPI | `swagger_api_docs.png` | Done |
 | Docker | `Dockerfile`, `docker-compose.yml` | Done |
-| GitHub Actions | Successful workflow screenshot | Passing, needs your screenshot |
+| GitHub Actions | `github_actions_run.png`, `github_actions_history.png` | Done |
 | Monitoring | `grafana_monitoring.png`, `prometheus_targets.png`, `evidently_drift_report.png` | Done |
 | Responsible AI | `docs/MODEL_CARD.md`, `DATA_CARD.md`, `RESPONSIBLE_AI.md` | Done |
 | Performance | `reports/performance_report.md` | Done |
