@@ -4,6 +4,7 @@
 #   MLflow        http://localhost:5000
 #   Prometheus    http://localhost:9090
 #   Grafana       http://localhost:3000
+#   Airflow       http://localhost:8080
 
 services:
   api:
@@ -77,7 +78,40 @@ services:
       - prometheus
     restart: unless-stopped
 
+  airflow:
+    build:
+      context: .
+      dockerfile: airflow/Dockerfile
+    image: agroscope-airflow:local
+    user: "50000:0"
+    command: >
+      bash -c "airflow db migrate &&
+      (airflow users create --username admin --password admin --firstname Agro --lastname Scope --role Admin --email admin@example.test || true) &&
+      exec airflow standalone"
+    ports:
+      # Sign in with admin / admin. Bound to this computer only, because Airflow can run commands.
+      - "127.0.0.1:8080:8080"
+    environment:
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "false"
+      AIRFLOW__WEBSERVER__WORKERS: "1"
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      PYTHONDONTWRITEBYTECODE: "1"
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags:ro
+      # Tasks run DVC stages against the project folder, so their results reach the API.
+      - .:/opt/agroscope
+      - airflow_data:/opt/airflow
+      # DVC's record of file hashes, so 10 GB of scenes are only hashed once.
+      - dvc_site_cache:/var/tmp/dvc
+    depends_on:
+      mlflow:
+        condition: service_healthy
+    restart: unless-stopped
+
 volumes:
+  airflow_data:
+  dvc_site_cache:
   mlflow_data:
   prometheus_data:
   grafana_data:

@@ -31,7 +31,7 @@ class Settings:
     STRESS_MAP_GEOJSON: Path = DATA_DIR / "processed" / "stress_map.geojson"
     IRRIGATION_MAP_GEOJSON: Path = DATA_DIR / "processed" / "irrigation_map.geojson"
     CYCLE_STATS_JSON: Path = DATA_DIR / "processed" / "cycle_statistics.json"
-    MODEL_PATH: Path = MODELS_DIR / "xgboost_model.pkl"
+    MODEL_PATH: Path = MODELS_DIR / "model.pkl"
     METADATA_PATH: Path = MODELS_DIR / "feature_metadata.json"
     DRIFT_SUMMARY_JSON: Path = DATA_DIR / "processed" / "drift_summary.json"
     DRIFT_REPORT_HTML: Path = DATA_DIR / "processed" / "drift_report.html"

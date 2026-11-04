@@ -50,7 +50,7 @@ def test_health_check():
     assert response.status_code == 200
     data = response.json()
     assert data["model"] == "LOADED"
-    assert data["model_version"].startswith("xgboost-")
+    assert data["model_version"].split("-")[0] in ("random_forest", "xgboost", "lightgbm")
 
 
 def test_health_is_degraded_without_results(no_results):

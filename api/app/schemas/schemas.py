@@ -10,7 +10,7 @@ class HealthResponse(BaseModel):
     status: str = Field(..., example="HEALTHY")
     database: str = Field(..., example="CONNECTED")
     model: str = Field(..., example="LOADED")
-    model_version: Optional[str] = Field(None, example="xgboost-1a2b3c4d")
+    model_version: Optional[str] = Field(None, example="lightgbm-1a2b3c4d")
     timestamp: str
 
 

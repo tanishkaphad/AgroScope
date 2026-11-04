@@ -55,14 +55,21 @@ stages:
       hash: md5
       md5: 26730ef4c334de04b89bf9295e79eb64
       size: 3031
+      isexec: true
+    - path: reports/validation_raw.json
+      hash: md5
+      md5: f7969aed625b12b83ee5477e7879eaee
+      size: 1180
     - path: src/config.py
       hash: md5
       md5: f3ca1a5c428b072b7c9a5849020bbddc
       size: 545
+      isexec: true
     - path: src/preprocessing/preprocess_bands.py
       hash: md5
       md5: 99bbd9ea1b94d8b0e76f2d9e3c96b7fb
       size: 20003
+      isexec: true
     params:
       configs/settings.yaml:
         aoi:
@@ -85,31 +92,34 @@ stages:
     outs:
     - path: data/processed/satellite_grid_features.csv
       hash: md5
-      md5: 659ed826e9c7fd671b092251883e1f41
-      size: 113297028
+      md5: 91ff89e751a642c11f55c28e3d891521
+      size: 112730708
     - path: data/processed/spatial_grid_250m.geojson
       hash: md5
-      md5: cd0421d94562cbca2699816601559e53
-      size: 18635716
+      md5: 9a54e24b8bdc0151efea166968034bb4
+      size: 17822622
   generate_labels:
     cmd: python src/target/generate_labels.py
     deps:
     - path: data/processed/satellite_grid_features.csv
       hash: md5
-      md5: 659ed826e9c7fd671b092251883e1f41
-      size: 113297028
+      md5: 91ff89e751a642c11f55c28e3d891521
+      size: 112730708
     - path: data/raw/weather/daily_weather.csv
       hash: md5
       md5: 82558d511ab0d84387cbbb9b2e472ae7
       size: 1645317
+      isexec: true
     - path: src/config.py
       hash: md5
       md5: f3ca1a5c428b072b7c9a5849020bbddc
       size: 545
+      isexec: true
     - path: src/target/generate_labels.py
       hash: md5
       md5: 1293092d66a8ba323cab6d3ab298c214
       size: 9990
+      isexec: true
     params:
       configs/settings.yaml:
         labels:
@@ -146,31 +156,38 @@ stages:
     outs:
     - path: data/features/features.csv
       hash: md5
-      md5: b748fefb34c9d8c21f42ea57314fb167
-      size: 168385058
+      md5: b2e725936718281842d77ff70be25fea
+      size: 167818738
     - path: data/processed/target_labels.csv
       hash: md5
-      md5: 9d6058a4774f4e5802f1c29564f5971b
-      size: 1938396
+      md5: 2e2baa7edad2d89b9be943b3e0bd8417
+      size: 1925987
   train_evaluate:
     cmd: python src/training/train.py
     deps:
     - path: data/features/features.csv
       hash: md5
-      md5: b748fefb34c9d8c21f42ea57314fb167
-      size: 168385058
+      md5: b2e725936718281842d77ff70be25fea
+      size: 167818738
+    - path: reports/validation_features.json
+      hash: md5
+      md5: 5362a1a46a29cf66be40fe282a165407
+      size: 876
     - path: src/config.py
       hash: md5
       md5: f3ca1a5c428b072b7c9a5849020bbddc
       size: 545
+      isexec: true
     - path: src/training/tracking.py
       hash: md5
-      md5: 635b0bd7d47aacf3bdd26e49bfb27ae3
-      size: 2223
+      md5: 256410f26f75d7db6aaeda4627122be1
+      size: 2788
+      isexec: true
     - path: src/training/train.py
       hash: md5
-      md5: c4d88328f86429623b7422983e87606f
-      size: 19790
+      md5: a98c5607a5c308937dc6c6b1b1cc1fcc
+      size: 18489
+      isexec: true
     params:
       configs/settings.yaml:
         training:
@@ -182,6 +199,7 @@ stages:
           - et0_8day_sum
           spatial_test_size: 0.25
           random_state: 42
+          n_jobs: 8
           features:
           - ndvi_mean
           - ndvi_std
@@ -217,58 +235,62 @@ stages:
             learning_rate: 0.08
             subsample: 0.8
             colsample_bytree: 0.8
+          lightgbm:
+            n_estimators: 150
+            max_depth: 6
+            num_leaves: 31
+            learning_rate: 0.08
+            subsample: 0.8
+            subsample_freq: 1
+            colsample_bytree: 0.8
     outs:
-    - path: models/candidate/baseline_random_forest.pkl
-      hash: md5
-      md5: e24379d6417c41787f9b79111595275a
-      size: 25731242
     - path: models/candidate/feature_metadata.json
       hash: md5
-      md5: 5f4e20837c3a70cbaf66429d34658cb9
-      size: 8248
-    - path: models/candidate/xgboost_model.json
+      md5: c70bc59cd655e72660926cc54969fb32
+      size: 15981
+    - path: models/candidate/model.pkl
       hash: md5
-      md5: 4d0a663eb00581894f76830e729bfe2d
-      size: 2636644
-    - path: models/candidate/xgboost_model.pkl
-      hash: md5
-      md5: 4ba0790b6da96c4f93dd5c8a616c71e4
-      size: 1743158
+      md5: ac395666f8879804176eb61304f5ad31
+      size: 1579382
   predict_cycle:
     cmd: python src/inference/predict.py
     deps:
     - path: data/features/features.csv
       hash: md5
-      md5: b748fefb34c9d8c21f42ea57314fb167
-      size: 168385058
+      md5: b2e725936718281842d77ff70be25fea
+      size: 167818738
     - path: data/processed/spatial_grid_250m.geojson
       hash: md5
-      md5: cd0421d94562cbca2699816601559e53
-      size: 18635716
+      md5: 9a54e24b8bdc0151efea166968034bb4
+      size: 17822622
     - path: models/feature_metadata.json
       hash: md5
-      md5: 5f4e20837c3a70cbaf66429d34658cb9
-      size: 8248
-    - path: models/xgboost_model.pkl
+      md5: c70bc59cd655e72660926cc54969fb32
+      size: 15981
+    - path: models/model.pkl
       hash: md5
-      md5: 4ba0790b6da96c4f93dd5c8a616c71e4
-      size: 1743158
+      md5: ac395666f8879804176eb61304f5ad31
+      size: 1579382
     - path: src/advisory/advisory_engine.py
       hash: md5
       md5: 58ab0c08f541aad5f766d24cbcb07d87
       size: 16632
+      isexec: true
     - path: src/config.py
       hash: md5
       md5: f3ca1a5c428b072b7c9a5849020bbddc
       size: 545
+      isexec: true
     - path: src/inference/explainability.py
       hash: md5
-      md5: f1e9a6ef66b5f879681a660855e3731e
-      size: 10723
+      md5: 6d6bf08c2cc46ec146574e0966fe7a5a
+      size: 10727
+      isexec: true
     - path: src/inference/predict.py
       hash: md5
-      md5: ce8fe5bdefb90f38c44b3cecb024f7fd
-      size: 20757
+      md5: 9e750b6c34ac838e2f3b9b42932a2bf1
+      size: 20737
+      isexec: true
     params:
       configs/settings.yaml:
         aoi.cell_area_ha: 6.25
@@ -278,44 +300,52 @@ stages:
     outs:
     - path: data/processed/cycle_statistics.json
       hash: md5
-      md5: 535da02a15a819f6ae0f7308ea5ff0b8
-      size: 740
+      md5: 8d1e67a0686da31dbdb22029573e97ca
+      size: 714
     - path: data/processed/irrigation_map.geojson
       hash: md5
-      md5: 806b579523bcbd3c86cea75cfb9e840c
-      size: 109254185
+      md5: 6455e22bbc62e02697efa7c2cc4748e0
+      size: 109227281
     - path: data/processed/stress_map.geojson
       hash: md5
-      md5: 5cd377301e76568bbb1e3a45b19d0ba5
-      size: 8541110
+      md5: d610b2f02b5d2a9ab87e0518fd954d2b
+      size: 8518298
   promote_model:
     cmd: python src/training/promote.py
     deps:
     - path: models/candidate/feature_metadata.json
       hash: md5
-      md5: 5f4e20837c3a70cbaf66429d34658cb9
-      size: 8248
-    - path: models/candidate/xgboost_model.pkl
+      md5: c70bc59cd655e72660926cc54969fb32
+      size: 15981
+    - path: models/candidate/model.pkl
       hash: md5
-      md5: 4ba0790b6da96c4f93dd5c8a616c71e4
-      size: 1743158
+      md5: ac395666f8879804176eb61304f5ad31
+      size: 1579382
+    - path: reports/evaluation_result.json
+      hash: md5
+      md5: a0a3fe59b1b47812e1e7d32a96258c1a
+      size: 634
     - path: src/config.py
       hash: md5
       md5: f3ca1a5c428b072b7c9a5849020bbddc
       size: 545
+      isexec: true
     - path: src/training/promote.py
       hash: md5
-      md5: 8ece433609fae211fc9410a7691af398
-      size: 5023
+      md5: 2e1ae48196e4631cdf10ce841d29d54f
+      size: 6146
+      isexec: true
     - path: src/training/tracking.py
       hash: md5
-      md5: 635b0bd7d47aacf3bdd26e49bfb27ae3
-      size: 2223
+      md5: 256410f26f75d7db6aaeda4627122be1
+      size: 2788
+      isexec: true
     params:
       configs/settings.yaml:
         promotion:
           metric: temporal_macro_f1
           min_improvement: 0.0
+          min_score: 0.85
         tracking:
           database: mlflow.db
           artifact_dir: mlruns
@@ -324,39 +354,37 @@ stages:
     outs:
     - path: models/feature_metadata.json
       hash: md5
-      md5: 5f4e20837c3a70cbaf66429d34658cb9
-      size: 8248
-    - path: models/xgboost_model.json
+      md5: c70bc59cd655e72660926cc54969fb32
+      size: 15981
+    - path: models/model.pkl
       hash: md5
-      md5: 4d0a663eb00581894f76830e729bfe2d
-      size: 2636644
-    - path: models/xgboost_model.pkl
-      hash: md5
-      md5: 4ba0790b6da96c4f93dd5c8a616c71e4
-      size: 1743158
+      md5: ac395666f8879804176eb61304f5ad31
+      size: 1579382
     - path: reports/promotion_decision.json
       hash: md5
-      md5: 3f17d5d0fcbfe1d3c7996eec7113e4b1
-      size: 327
+      md5: f4ef5dbf3feb100c98ed1bfb50354bd2
+      size: 352
   monitor_drift:
     cmd: python src/monitoring/drift.py
     deps:
     - path: data/features/features.csv
       hash: md5
-      md5: b748fefb34c9d8c21f42ea57314fb167
-      size: 168385058
+      md5: b2e725936718281842d77ff70be25fea
+      size: 167818738
     - path: data/processed/cycle_statistics.json
       hash: md5
-      md5: 535da02a15a819f6ae0f7308ea5ff0b8
-      size: 740
+      md5: 8d1e67a0686da31dbdb22029573e97ca
+      size: 714
     - path: src/config.py
       hash: md5
       md5: f3ca1a5c428b072b7c9a5849020bbddc
       size: 545
+      isexec: true
     - path: src/monitoring/drift.py
       hash: md5
       md5: 481f331ad66fea7661a5556f13deb150
       size: 4941
+      isexec: true
     params:
       configs/settings.yaml:
         monitoring:
@@ -392,9 +420,267 @@ stages:
     outs:
     - path: data/processed/drift_report.html
       hash: md5
-      md5: f53d60856c771f1e91122ad10526d8c5
-      size: 5285766
+      md5: 451c66e88f0048e5a20565613ac792ee
+      size: 5284906
     - path: data/processed/drift_summary.json
       hash: md5
-      md5: 64667f427ae68ac53849a02ed5679796
-      size: 4600
+      md5: 7d36e7b7e8efb0543db970eede34ed83
+      size: 4412
+  validate_raw:
+    cmd: python src/validation/validate_data.py --stage raw
+    deps:
+    - path: data/raw/satellite/scenes_manifest.csv
+      hash: md5
+      md5: 9e320537202764ebbf4cce3c1f296fcd
+      size: 44569
+      isexec: true
+    - path: data/raw/weather/daily_weather.csv
+      hash: md5
+      md5: 82558d511ab0d84387cbbb9b2e472ae7
+      size: 1645317
+      isexec: true
+    - path: src/config.py
+      hash: md5
+      md5: f3ca1a5c428b072b7c9a5849020bbddc
+      size: 545
+      isexec: true
+    - path: src/validation/validate_data.py
+      hash: md5
+      md5: af099ac54957ee9edca062e29ed54ce4
+      size: 7434
+      isexec: true
+    params:
+      configs/settings.yaml:
+        validation:
+          max_missing_share: 0.01
+          min_dates: 20
+          manifest_columns:
+          - scene_id
+          - acquisition_date
+          - cloud_cover_pct
+          - mgrs_tile
+          weather_ranges:
+            temp_max_c:
+            - -5
+            - 55
+            temp_mean_c:
+            - -5
+            - 50
+            rainfall_mm:
+            - 0
+            - 500
+            humidity_pct:
+            - 0
+            - 100
+            wind_speed_mps:
+            - 0
+            - 40
+            solar_radiation_mj:
+            - 0
+            - 45
+            et0_mm:
+            - 0
+            - 20
+          feature_ranges:
+            ndvi_mean:
+            - -1
+            - 1
+            ndwi_mean:
+            - -1
+            - 1
+            evi_mean:
+            - -5
+            - 5
+            b02_mean:
+            - 0
+            - 12000
+            b03_mean:
+            - 0
+            - 12000
+            b04_mean:
+            - 0
+            - 12000
+            b08_mean:
+            - 0
+            - 12000
+            b11_mean:
+            - 0
+            - 12000
+            b12_mean:
+            - 0
+            - 12000
+            temp_max_c:
+            - -5
+            - 55
+            humidity_pct:
+            - 0
+            - 100
+            wind_speed_mps:
+            - 0
+            - 40
+            rainfall_8day:
+            - 0
+            - 1500
+            et0_8day_sum:
+            - 0
+            - 160
+        weather.end_date: '2024-05-31'
+        weather.start_date: '2023-01-01'
+    outs:
+    - path: reports/validation_raw.json
+      hash: md5
+      md5: f7969aed625b12b83ee5477e7879eaee
+      size: 1180
+  validate_features:
+    cmd: python src/validation/validate_data.py --stage features
+    deps:
+    - path: data/features/features.csv
+      hash: md5
+      md5: b2e725936718281842d77ff70be25fea
+      size: 167818738
+    - path: src/config.py
+      hash: md5
+      md5: f3ca1a5c428b072b7c9a5849020bbddc
+      size: 545
+      isexec: true
+    - path: src/validation/validate_data.py
+      hash: md5
+      md5: af099ac54957ee9edca062e29ed54ce4
+      size: 7434
+      isexec: true
+    params:
+      configs/settings.yaml:
+        training.features:
+        - ndvi_mean
+        - ndvi_std
+        - ndwi_mean
+        - ndwi_std
+        - evi_mean
+        - evi_std
+        - b02_mean
+        - b03_mean
+        - b04_mean
+        - b08_mean
+        - b11_mean
+        - b12_mean
+        - temp_mean_c
+        - temp_max_c
+        - humidity_pct
+        - wind_speed_mps
+        - solar_radiation_mj
+        - rainfall_8day
+        - rainfall_16day
+        - rainfall_30day
+        - temp_8day_mean
+        - temp_30day_mean
+        - temp_8day_max
+        - et0_8day_sum
+        - et0_16day_sum
+        training.target_column: target_stress_class
+        training.temporal_split_date: '2024-02-01'
+        validation:
+          max_missing_share: 0.01
+          min_dates: 20
+          manifest_columns:
+          - scene_id
+          - acquisition_date
+          - cloud_cover_pct
+          - mgrs_tile
+          weather_ranges:
+            temp_max_c:
+            - -5
+            - 55
+            temp_mean_c:
+            - -5
+            - 50
+            rainfall_mm:
+            - 0
+            - 500
+            humidity_pct:
+            - 0
+            - 100
+            wind_speed_mps:
+            - 0
+            - 40
+            solar_radiation_mj:
+            - 0
+            - 45
+            et0_mm:
+            - 0
+            - 20
+          feature_ranges:
+            ndvi_mean:
+            - -1
+            - 1
+            ndwi_mean:
+            - -1
+            - 1
+            evi_mean:
+            - -5
+            - 5
+            b02_mean:
+            - 0
+            - 12000
+            b03_mean:
+            - 0
+            - 12000
+            b04_mean:
+            - 0
+            - 12000
+            b08_mean:
+            - 0
+            - 12000
+            b11_mean:
+            - 0
+            - 12000
+            b12_mean:
+            - 0
+            - 12000
+            temp_max_c:
+            - -5
+            - 55
+            humidity_pct:
+            - 0
+            - 100
+            wind_speed_mps:
+            - 0
+            - 40
+            rainfall_8day:
+            - 0
+            - 1500
+            et0_8day_sum:
+            - 0
+            - 160
+    outs:
+    - path: reports/validation_features.json
+      hash: md5
+      md5: 5362a1a46a29cf66be40fe282a165407
+      size: 876
+  evaluate_model:
+    cmd: python src/training/evaluate.py
+    deps:
+    - path: models/candidate/feature_metadata.json
+      hash: md5
+      md5: c70bc59cd655e72660926cc54969fb32
+      size: 15981
+    - path: src/config.py
+      hash: md5
+      md5: f3ca1a5c428b072b7c9a5849020bbddc
+      size: 545
+      isexec: true
+    - path: src/training/evaluate.py
+      hash: md5
+      md5: 2fa153b86c9cf6b366f609dbf95b7fe2
+      size: 3232
+      isexec: true
+    params:
+      configs/settings.yaml:
+        promotion:
+          metric: temporal_macro_f1
+          min_improvement: 0.0
+          min_score: 0.85
+    outs:
+    - path: reports/evaluation_result.json
+      hash: md5
+      md5: a0a3fe59b1b47812e1e7d32a96258c1a
+      size: 634

@@ -1,0 +1,24 @@
+{
+  "selected_model": "lightgbm",
+  "metric": "temporal_macro_f1",
+  "score": 0.9242,
+  "min_score": 0.85,
+  "passed": true,
+  "scores_by_model": {
+    "random_forest": {
+      "unseen_cells_macro_f1": 0.9877,
+      "later_dates_macro_f1": 0.8845,
+      "later_dates_without_label_inputs_macro_f1": 0.774
+    },
+    "xgboost": {
+      "unseen_cells_macro_f1": 0.9967,
+      "later_dates_macro_f1": 0.915,
+      "later_dates_without_label_inputs_macro_f1": 0.7323
+    },
+    "lightgbm": {
+      "unseen_cells_macro_f1": 0.9966,
+      "later_dates_macro_f1": 0.9242,
+      "later_dates_without_label_inputs_macro_f1": 0.6707
+    }
+  }
+}

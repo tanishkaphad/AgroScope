@@ -1,0 +1,55 @@
+{
+  "stage": "raw",
+  "passed": true,
+  "rows": {
+    "weather": 12408,
+    "scenes": 61
+  },
+  "checks": [
+    {
+      "check": "required_columns",
+      "passed": true,
+      "detail": "All present"
+    },
+    {
+      "check": "value_ranges",
+      "passed": true,
+      "detail": "7 columns within range"
+    },
+    {
+      "check": "missing_values",
+      "passed": true,
+      "detail": "All within 1.0%"
+    },
+    {
+      "check": "date_coverage",
+      "passed": true,
+      "detail": "Data covers 2023-01-01 to 2024-05-31, and 2023-01-01 to 2024-05-31 is required"
+    },
+    {
+      "check": "no_gaps_between_points",
+      "passed": true,
+      "detail": "Days per point range from 517 to 517"
+    },
+    {
+      "check": "required_columns",
+      "passed": true,
+      "detail": "All present"
+    },
+    {
+      "check": "scene_count",
+      "passed": true,
+      "detail": "27 scene dates, and at least 20 are required"
+    },
+    {
+      "check": "missing_values",
+      "passed": true,
+      "detail": "All within 0.0%"
+    },
+    {
+      "check": "weather_covers_scenes",
+      "passed": true,
+      "detail": "Scenes run from 2023-10-06 to 2024-03-29"
+    }
+  ]
+}

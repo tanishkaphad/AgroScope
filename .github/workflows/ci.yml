@@ -30,7 +30,7 @@ jobs:
         run: |
           if [ -n "$GDRIVE_CREDENTIALS_DATA" ]; then
             dvc remote modify --local gdrive gdrive_use_service_account true
-            dvc pull train_evaluate predict_cycle
+            dvc pull promote_model predict_cycle
           else
             echo "GDRIVE_CREDENTIALS_DATA isn't set, so tests that need these files will be skipped."
           fi

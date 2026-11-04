@@ -2,7 +2,7 @@
 
 How we'll meet the MLOps course rubric in the 2 days left from 2026-11-04. The long-term product roadmap is in [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md), and pauses until this is done.
 
-**Status:** section 1 done, sections 2-8 to do.
+**Status:** sections 1-3 done, sections 4-8 to do.
 
 **Rules:** Claude runs no git commands, and every service stays free.
 
@@ -41,12 +41,12 @@ How we'll meet the MLOps course rubric in the 2 days left from 2026-11-04. The l
 
 **Goal:** one baseline and two candidates, compared fairly in MLflow.
 
-- [ ] Keep Random Forest as the baseline and XGBoost as candidate 1.
-- [ ] Add LightGBM as candidate 2, and confirm SHAP works with it.
-- [ ] Log every model as its own MLflow run, with parameters, metrics and files.
-- [ ] Choose the best model using the later-dates score.
-- [ ] Add a minimum score to the gate as well as the champion comparison.
-- [ ] Add version metadata to the registered model.
+- [x] Keep Random Forest as the baseline and XGBoost as candidate 1.
+- [x] Add LightGBM as candidate 2, and confirm SHAP works with it.
+- [x] Log every model as its own MLflow run, with parameters, metrics and files.
+- [x] Choose the best model using the later-dates score.
+- [x] Add a minimum score to the gate as well as the champion comparison.
+- [x] Add version metadata to the registered model.
 
 **Files:** `src/training/train.py`, `src/training/promote.py`, `configs/settings.yaml`.
 
@@ -56,12 +56,12 @@ How we'll meet the MLOps course rubric in the 2 days left from 2026-11-04. The l
 
 **Goal:** an Airflow DAG runs every required step and finishes successfully.
 
-- [ ] Add `src/validation/validate_data.py`, checking required columns, value ranges, missing values and date coverage. A failure stops the run.
-- [ ] Add it to the DVC pipeline.
-- [ ] Add a small evaluation step that reads the latest scores and records whether they pass.
-- [ ] Add Airflow to Docker Compose as a single container, the simplest free setup.
-- [ ] Build the DAG with these tasks: ingestion, validation, preprocessing, feature engineering, training, evaluation and model registration.
-- [ ] Have tasks call DVC stages, so unchanged steps are skipped and raw data isn't reprocessed needlessly.
+- [x] Add `src/validation/validate_data.py`, checking required columns, value ranges, missing values and date coverage. A failure stops the run.
+- [x] Add it to the DVC pipeline.
+- [x] Add a small evaluation step that reads the latest scores and records whether they pass.
+- [x] Add Airflow to Docker Compose as a single container, the simplest free setup.
+- [x] Build the DAG with these tasks: ingestion, validation, preprocessing, feature engineering, training, evaluation and model registration.
+- [x] Have tasks call DVC stages, so unchanged steps are skipped and raw data isn't reprocessed needlessly.
 
 **Files:** `airflow/dags/agroscope_pipeline.py`, `airflow/Dockerfile`, `src/validation/validate_data.py`, `dvc.yaml`.
 
@@ -70,6 +70,8 @@ How we'll meet the MLOps course rubric in the 2 days left from 2026-11-04. The l
 **Fallback:** if the full raw-data flow won't run reliably inside Airflow, its ingestion task will use the cloud and already-versioned data rather than the 10 GB of raw scenes. The task list stays the same, and the limit gets written down.
 
 **Done when:** every DAG task is green in the Airflow UI.
+
+**Result:** the full raw-data flow ran inside Airflow, so the fallback wasn't needed. A rerun with nothing changed took about 90 seconds, with all 10 stages skipped.
 
 ## 4. CI additions
 

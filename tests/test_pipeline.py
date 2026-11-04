@@ -16,8 +16,10 @@ from src.preprocessing import cloud_features
 from src.preprocessing.preprocess_bands import compute_spectral_indices, remove_boa_offset
 from src.target.generate_labels import assign_nearest_weather_points, compute_climatic_water_deficit
 from src.training import promote, tracking
+from src.training.evaluate import evaluate_candidate
 from src.training.promote import decide_promotion
-from src.training.train import FEATURE_COLUMNS
+from src.training.train import FEATURE_COLUMNS, MODEL_SPECS, build_model, ranked_importances, select_best_model
+from src.validation import validate_data
 
 
 def test_settings_load_every_section():
@@ -184,10 +186,124 @@ def test_weather_request_waits_longer_when_rate_limited(monkeypatch):
 
 
 def test_promotion_requires_candidate_to_match_champion():
-    assert decide_promotion(0.8, None, 0.0)[0] is True
-    assert decide_promotion(0.8, 0.8, 0.0)[0] is True
-    assert decide_promotion(0.79, 0.8, 0.0)[0] is False
-    assert decide_promotion(0.8, 0.8, 0.01)[0] is False
+    assert decide_promotion(0.8, None, 0.0, 0.5)[0] is True
+    assert decide_promotion(0.8, 0.8, 0.0, 0.5)[0] is True
+    assert decide_promotion(0.79, 0.8, 0.0, 0.5)[0] is False
+    assert decide_promotion(0.8, 0.8, 0.01, 0.5)[0] is False
+
+
+def test_promotion_rejects_a_score_below_the_minimum_even_with_no_champion():
+    promoted, reason = decide_promotion(0.4, None, 0.0, 0.5)
+    assert promoted is False
+    assert "minimum" in reason
+    assert decide_promotion(0.4, 0.3, 0.0, 0.5)[0] is False
+
+
+def test_best_model_is_chosen_by_score_and_a_tie_prefers_the_baseline():
+    assert select_best_model({"random_forest": 0.7, "xgboost": 0.9, "lightgbm": 0.8}) == "xgboost"
+    assert select_best_model({"random_forest": 0.9, "xgboost": 0.9, "lightgbm": 0.9}) == "random_forest"
+
+
+def test_every_model_trains_predicts_and_ranks_features():
+    rng = np.random.default_rng(0)
+    X = pd.DataFrame(rng.normal(size=(150, 3)), columns=["a", "b", "c"])
+    y = pd.Series(np.digitize(X["a"], [-0.5, 0.5]))
+    for name in MODEL_SPECS:
+        model = build_model(name)
+        model.set_params(n_estimators=5).fit(X, y)
+        assert model.predict_proba(X).shape == (150, 3)
+        ranked = ranked_importances(model, list(X.columns))
+        assert {feature for feature, _ in ranked} == {"a", "b", "c"}
+        assert sum(share for _, share in ranked) == pytest.approx(1.0)
+
+
+def _metadata(score):
+    entry = {"macro_f1": score}
+    return {
+        "selected_model": "lightgbm",
+        "metrics": {"lightgbm": entry},
+        "temporal_metrics": {"lightgbm": entry},
+        "temporal_metrics_without_label_inputs": {"lightgbm": entry},
+    }
+
+
+def test_evaluation_records_pass_and_fail_against_the_minimum():
+    assert evaluate_candidate(_metadata(0.9), 0.85)["passed"] is True
+    failed = evaluate_candidate(_metadata(0.5), 0.85)
+    assert failed["passed"] is False
+    assert failed["scores_by_model"]["lightgbm"]["later_dates_macro_f1"] == 0.5
+
+
+def _weather_frame():
+    dates = [str(d.date()) for d in pd.date_range(settings["weather"]["start_date"], settings["weather"]["end_date"])]
+    rows = pd.DataFrame({"date": dates, "weather_point_id": "WX_000"})
+    for column, (low, high) in settings["validation"]["weather_ranges"].items():
+        rows[column] = (low + high) / 2
+    return rows
+
+
+def _feature_frame():
+    rows = []
+    start = pd.Timestamp(settings["training"]["temporal_split_date"]) - pd.Timedelta(days=5 * (settings["validation"]["min_dates"] - 3))
+    for i in range(settings["validation"]["min_dates"]):
+        for label in (0, 1, 2):
+            rows.append({"cell_id": f"C{label}", "date": str((start + pd.Timedelta(days=5 * i)).date()), "is_vegetated": True, "target_stress_class": label})
+    frame = pd.DataFrame(rows)
+    for column in settings["training"]["features"]:
+        frame[column] = 0.1
+    return frame
+
+
+def _failed(checks):
+    return {c["check"] for c in checks if not c["passed"]}
+
+
+def test_valid_weather_and_features_pass():
+    assert _failed(validate_data.validate_weather(_weather_frame())) == set()
+    assert _failed(validate_data.validate_features(_feature_frame())) == set()
+
+
+def test_weather_validation_stops_on_each_kind_of_problem():
+    assert "required_columns" in _failed(validate_data.validate_weather(_weather_frame().drop(columns=["et0_mm"])))
+
+    hot = _weather_frame()
+    hot.loc[0, "temp_max_c"] = 90.0
+    assert "value_ranges" in _failed(validate_data.validate_weather(hot))
+
+    gappy = _weather_frame().astype({"et0_mm": float})
+    gappy.loc[:, "et0_mm"] = np.nan
+    assert "missing_values" in _failed(validate_data.validate_weather(gappy))
+
+    short = _weather_frame().iloc[:-30]
+    assert "date_coverage" in _failed(validate_data.validate_weather(short))
+
+
+def test_feature_validation_stops_on_each_kind_of_problem():
+    assert "required_columns" in _failed(validate_data.validate_features(_feature_frame().drop(columns=["ndvi_mean"])))
+
+    bad_index = _feature_frame()
+    bad_index.loc[0, "ndvi_mean"] = 5.0
+    assert "value_ranges" in _failed(validate_data.validate_features(bad_index))
+
+    bad_label = _feature_frame()
+    bad_label.loc[0, "target_stress_class"] = 7
+    assert "label_values" in _failed(validate_data.validate_features(bad_label))
+
+    duplicated = pd.concat([_feature_frame(), _feature_frame().iloc[[0]]])
+    assert "one_row_per_cell_and_date" in _failed(validate_data.validate_features(duplicated))
+
+    early_only = _feature_frame()
+    early_only = early_only[early_only["date"] < settings["training"]["temporal_split_date"]]
+    assert "date_coverage" in _failed(validate_data.validate_features(early_only))
+
+
+def test_scene_validation_needs_weather_for_every_scene_date():
+    columns = settings["validation"]["manifest_columns"]
+    dates = [str(d.date()) for d in pd.date_range("2024-01-01", periods=settings["validation"]["min_dates"])]
+    manifest = pd.DataFrame({c: "x" for c in columns}, index=range(len(dates)))
+    manifest["acquisition_date"] = dates
+    assert _failed(validate_data.validate_scenes(manifest, pd.Series(["2023-01-01", "2025-01-01"]))) == set()
+    assert "weather_covers_scenes" in _failed(validate_data.validate_scenes(manifest, pd.Series(["2024-01-01", "2024-01-02"])))
 
 
 def test_drift_direction_depends_on_test_type():
@@ -213,7 +329,7 @@ def _log_candidate(tmp_path, name, score):
     candidate.mkdir()
     for file_name in promote.EXPORTED_FILES:
         (candidate / file_name).write_text(json.dumps({"model": name}), encoding="utf-8")
-    run_id = tracking.log_training_run({"name": name}, {"temporal_macro_f1": score}, {}, [candidate / "xgboost_model.pkl", candidate / "xgboost_model.json"])
+    run_id = tracking.log_training_run({"name": name}, {"temporal_macro_f1": score}, {}, [candidate / "model.pkl"])
     (candidate / "feature_metadata.json").write_text(json.dumps({"mlflow_run_id": run_id, "model": name}), encoding="utf-8")
     tracking.attach_run_artifact(run_id, candidate / "feature_metadata.json")
     return candidate
@@ -229,16 +345,32 @@ def test_gate_promotes_better_model_and_keeps_champion_over_worse_one(tmp_path, 
     def run_gate(name, score):
         return promote.run_promotion_gate(_log_candidate(tmp_path, name, score), production, decision_path)
 
-    first = run_gate("first", 0.80)
+    first = run_gate("first", 0.90)
     assert first["promoted"] is True
     assert first["active_version"] == 1
 
-    worse = run_gate("worse", 0.70)
+    worse = run_gate("worse", 0.86)
     assert worse["promoted"] is False
     assert worse["active_version"] == 1
-    assert json.loads((production / "xgboost_model.pkl").read_text(encoding="utf-8"))["model"] == "first"
+    assert json.loads((production / "model.pkl").read_text(encoding="utf-8"))["model"] == "first"
 
-    better = run_gate("better", 0.90)
+    better = run_gate("better", 0.95)
     assert better["promoted"] is True
     assert better["active_version"] == 3
-    assert json.loads((production / "xgboost_model.pkl").read_text(encoding="utf-8"))["model"] == "better"
+    assert json.loads((production / "model.pkl").read_text(encoding="utf-8"))["model"] == "better"
+
+    below_minimum = run_gate("below_minimum", settings["promotion"]["min_score"] - 0.01)
+    assert below_minimum["promoted"] is False
+    assert below_minimum["active_version"] == 3
+    assert "minimum" in below_minimum["reason"]
+
+
+def test_gate_fails_when_the_first_model_is_below_the_minimum(tmp_path, monkeypatch):
+    monkeypatch.setattr(tracking, "TRACKING_URI", f"sqlite:///{(tmp_path / 'mlflow.db').as_posix()}")
+    monkeypatch.setattr(tracking, "ARTIFACT_ROOT", (tmp_path / "artifacts").as_uri())
+    decision_path = tmp_path / "decision.json"
+    candidate = _log_candidate(tmp_path, "poor", settings["promotion"]["min_score"] - 0.01)
+    with pytest.raises(RuntimeError, match="No model can be published"):
+        promote.run_promotion_gate(candidate, tmp_path / "production", decision_path)
+    assert json.loads(decision_path.read_text(encoding="utf-8"))["promoted"] is False
+    assert not (tmp_path / "production").exists()

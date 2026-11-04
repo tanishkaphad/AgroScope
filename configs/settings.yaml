@@ -78,6 +78,8 @@ training:
   label_input_features: [ndwi_mean, rainfall_8day, et0_8day_sum]
   spatial_test_size: 0.25
   random_state: 42
+  # A fixed thread count: using every core ran over 10 times slower inside Docker
+  n_jobs: 8
   features:
     - ndvi_mean
     - ndvi_std
@@ -113,6 +115,14 @@ training:
     learning_rate: 0.08
     subsample: 0.8
     colsample_bytree: 0.8
+  lightgbm:
+    n_estimators: 150
+    max_depth: 6
+    num_leaves: 31
+    learning_rate: 0.08
+    subsample: 0.8
+    subsample_freq: 1
+    colsample_bytree: 0.8
 
 inference:
   min_latest_coverage: 0.9
@@ -126,6 +136,37 @@ tracking:
 promotion:
   metric: temporal_macro_f1
   min_improvement: 0.0
+  # A candidate below this is rejected even when there's no champion to beat
+  min_score: 0.85
+
+# Limits wide enough for real extremes in this region, and narrow enough to catch unit and offset errors
+validation:
+  max_missing_share: 0.01
+  min_dates: 20
+  manifest_columns: [scene_id, acquisition_date, cloud_cover_pct, mgrs_tile]
+  weather_ranges:
+    temp_max_c: [-5, 55]
+    temp_mean_c: [-5, 50]
+    rainfall_mm: [0, 500]
+    humidity_pct: [0, 100]
+    wind_speed_mps: [0, 40]
+    solar_radiation_mj: [0, 45]
+    et0_mm: [0, 20]
+  feature_ranges:
+    ndvi_mean: [-1, 1]
+    ndwi_mean: [-1, 1]
+    evi_mean: [-5, 5]
+    b02_mean: [0, 12000]
+    b03_mean: [0, 12000]
+    b04_mean: [0, 12000]
+    b08_mean: [0, 12000]
+    b11_mean: [0, 12000]
+    b12_mean: [0, 12000]
+    temp_max_c: [-5, 55]
+    humidity_pct: [0, 100]
+    wind_speed_mps: [0, 40]
+    rainfall_8day: [0, 1500]
+    et0_8day_sum: [0, 160]
 
 monitoring:
   sample_rows: 20000

@@ -44,7 +44,7 @@ class ModelService:
                 metadata_path=settings.METADATA_PATH,
             )
             digest = hashlib.md5(settings.MODEL_PATH.read_bytes()).hexdigest()
-            self.version = f"xgboost-{digest[:8]}"
+            self.version = f"{self.predictor.metadata.get('model_type', 'model')}-{digest[:8]}"
             logger.info("AgroScopePredictor initialized successfully.")
         except Exception as exc:
             logger.error("Failed to load AgroScopePredictor: %s", exc)
@@ -74,11 +74,11 @@ class ModelService:
             return {}
         with open(settings.METADATA_PATH, "r", encoding="utf-8") as f:
             metadata = json.load(f)
-        temporal = metadata.get("temporal_metrics", {})
+        model_type = metadata.get("model_type")
         return {
-            "macro_f1_score": metadata.get("metrics", {}).get("xgboost", {}).get("macro_f1"),
-            "temporal_macro_f1": temporal.get("xgboost", {}).get("macro_f1"),
-            "temporal_macro_f1_without_label_inputs": temporal.get("xgboost_without_label_inputs", {}).get("macro_f1"),
+            "macro_f1_score": metadata.get("metrics", {}).get(model_type, {}).get("macro_f1"),
+            "temporal_macro_f1": metadata.get("temporal_metrics", {}).get(model_type, {}).get("macro_f1"),
+            "temporal_macro_f1_without_label_inputs": metadata.get("temporal_metrics_without_label_inputs", {}).get(model_type, {}).get("macro_f1"),
         }
 
 

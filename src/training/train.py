@@ -1,24 +1,9 @@
-"""AgroScope Phase 10 & 11 — Machine Learning Training & Validation Pipeline.
+"""AgroScope Model Training and Comparison.
 
-Implements the complete ML training workflow:
-1. Loads unified features dataset (data/features/features.csv).
-2. Filters for active agricultural vegetation (is_vegetated == True).
-3. Strictly isolates input features (satellite indices + bands + weather) from target labels
-   (excludes water_deficit_8day_mm to prevent data leakage).
-4. Implements Temporal Holdout Validation:
-   - Train Set: Oct 2023 – Jan 2024 (Early & mid Rabi season)
-   - Test Set: Feb 2024 – Mar 2024 (Late Rabi maturity season)
-   - Prevents spatial-temporal autocorrelation leakage across 8-day cycles.
-5. Balances class weights to address 88% / 8% / 4% class distribution.
-6. Trains:
-   - Baseline: Balanced Random Forest Classifier
-   - Main Model: Tuned XGBoost Classifier
-7. Computes evaluation benchmarks:
-   - Macro-averaged F1 Score
-   - Per-class Recall (especially High & Moderate Stress Recall)
-   - Confusion Matrix
-   - Feature Importances
-8. Persists serialized models and metadata to models/ for backend API inference.
+Trains one baseline and two candidates on the same data, and scores each three ways:
+on unseen cells, on later dates, and on later dates without the inputs the labels come from.
+Each model becomes its own MLflow run, and the best later-dates score becomes the candidate
+in models/candidate/ for the promotion gate.
 """
 
 from __future__ import annotations
@@ -31,8 +16,12 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 import pickle
+import shutil
+import tempfile
+
 import numpy as np
 import pandas as pd
+from lightgbm import LGBMClassifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix, f1_score, roc_auc_score
 from sklearn.model_selection import GroupShuffleSplit
@@ -62,6 +51,15 @@ FEATURE_COLUMNS = TRAINING["features"]
 TARGET_COL = TRAINING["target_column"]
 SPLIT_DATE_THRESHOLD = TRAINING["temporal_split_date"]
 RANDOM_STATE = TRAINING["random_state"]
+N_JOBS = TRAINING["n_jobs"]
+
+MODEL_FILE = "model.pkl"
+METADATA_FILE = "feature_metadata.json"
+MODEL_SPECS = {
+    "random_forest": {"title": "Random Forest", "role": "baseline"},
+    "xgboost": {"title": "XGBoost", "role": "candidate"},
+    "lightgbm": {"title": "LightGBM", "role": "candidate"},
+}
 
 
 def prepare_datasets(
@@ -127,54 +125,38 @@ def prepare_datasets(
     return X_train, X_test, y_train, y_test, FEATURE_COLUMNS, split_desc
 
 
-def train_baseline_random_forest(
-    X_train: pd.DataFrame,
-    y_train: pd.Series,
-    n_estimators: int = TRAINING["random_forest"]["n_estimators"],
-    max_depth: int = TRAINING["random_forest"]["max_depth"],
-) -> RandomForestClassifier:
-    """Train class-balanced Random Forest baseline."""
-    logger.info("Training Baseline Random Forest (n_estimators=%d, max_depth=%d)...", n_estimators, max_depth)
-    rf = RandomForestClassifier(
-        n_estimators=n_estimators,
-        max_depth=max_depth,
-        class_weight="balanced",
-        n_jobs=-1,
-        random_state=RANDOM_STATE,
-    )
-    rf.fit(X_train, y_train)
-    logger.info("Random Forest baseline training completed.")
-    return rf
+def build_model(name: str) -> Any:
+    """Create an untrained model from its settings. All three correct for class imbalance."""
+    params = TRAINING[name]
+    if name == "random_forest":
+        return RandomForestClassifier(class_weight="balanced", n_jobs=N_JOBS, random_state=RANDOM_STATE, **params)
+    if name == "xgboost":
+        return XGBClassifier(objective="multi:softprob", num_class=3, eval_metric="mlogloss", n_jobs=N_JOBS, random_state=RANDOM_STATE, **params)
+    if name == "lightgbm":
+        return LGBMClassifier(objective="multiclass", num_class=3, class_weight="balanced", n_jobs=N_JOBS, random_state=RANDOM_STATE, verbose=-1, **params)
+    raise ValueError(f"Unknown model: {name}")
 
 
-def train_xgboost_classifier(
-    X_train: pd.DataFrame,
-    y_train: pd.Series,
-    n_estimators: int = TRAINING["xgboost"]["n_estimators"],
-    max_depth: int = TRAINING["xgboost"]["max_depth"],
-    learning_rate: float = TRAINING["xgboost"]["learning_rate"],
-) -> XGBClassifier:
-    """Train weighted XGBoost classifier."""
-    logger.info("Training Main Model: XGBoost Classifier (n_estimators=%d, max_depth=%d, lr=%.2f)...", n_estimators, max_depth, learning_rate)
+def train_model(name: str, X_train: pd.DataFrame, y_train: pd.Series) -> Any:
+    """Train one model. XGBoost has no class_weight option, so it takes sample weights."""
+    model = build_model(name)
+    if name == "xgboost":
+        model.fit(X_train, y_train, sample_weight=compute_sample_weight("balanced", y_train))
+    else:
+        model.fit(X_train, y_train)
+    return model
 
-    # Compute sample weights to balance class frequencies
-    sample_weights = compute_sample_weight("balanced", y_train)
 
-    xgb = XGBClassifier(
-        n_estimators=n_estimators,
-        max_depth=max_depth,
-        learning_rate=learning_rate,
-        subsample=TRAINING["xgboost"]["subsample"],
-        colsample_bytree=TRAINING["xgboost"]["colsample_bytree"],
-        objective="multi:softprob",
-        num_class=3,
-        eval_metric="mlogloss",
-        random_state=RANDOM_STATE,
-        n_jobs=-1,
-    )
-    xgb.fit(X_train, y_train, sample_weight=sample_weights)
-    logger.info("XGBoost training completed.")
-    return xgb
+def select_best_model(scores: Dict[str, float]) -> str:
+    """Pick the highest score. On a tie, the earliest in MODEL_SPECS wins, so the baseline is preferred."""
+    return max(scores, key=lambda name: (scores[name], -list(MODEL_SPECS).index(name)))
+
+
+def ranked_importances(model: Any, feature_names: List[str]) -> List[Tuple[str, float]]:
+    """Rank features by share of importance. LightGBM reports split counts, so all are normalised."""
+    importances = np.asarray(model.feature_importances_, dtype=float)
+    shares = importances / (importances.sum() or 1.0)
+    return sorted(zip(feature_names, [float(x) for x in shares]), key=lambda x: x[1], reverse=True)
 
 
 def evaluate_model(
@@ -263,7 +245,7 @@ def run_training_pipeline(
     strategy: str = "spatial",
     sample_size: Optional[int] = None,
 ) -> Path:
-    """Execute complete Phase 10 & 11 training and evaluation pipeline."""
+    """Train every model, log each as its own run, and save the best one as the candidate."""
     base_dir = Path(__file__).resolve().parent.parent.parent
     if features_csv is None:
         features_csv = base_dir / "data" / "features" / "features.csv"
@@ -279,163 +261,146 @@ def run_training_pipeline(
         strategy=strategy,
         sample_size=sample_size,
     )
-
-    # 1. Train Baseline Random Forest
-    rf_model = train_baseline_random_forest(X_train, y_train)
-    rf_eval = evaluate_model(rf_model, X_test, y_test, model_name="Random Forest Baseline")
-
-    # 2. Train Main XGBoost Classifier
-    xgb_model = train_xgboost_classifier(X_train, y_train)
-    xgb_eval = evaluate_model(xgb_model, X_test, y_test, model_name="XGBoost Classifier")
-
-    # 2b. Date-based check: train on earlier dates and test on later ones
-    X_past, X_future, y_past, y_future, _, temporal_desc = prepare_datasets(features_csv=features_csv, strategy="temporal")
-    temporal_eval = evaluate_model(train_xgboost_classifier(X_past, y_past), X_future, y_future, model_name="XGBoost Date-Based Check")
-
-    # 2c. Leakage check: the same test without the inputs the labels are calculated from
-    label_inputs = TRAINING["label_input_features"]
-    temporal_no_label_inputs_eval = evaluate_model(
-        train_xgboost_classifier(X_past.drop(columns=label_inputs), y_past),
-        X_future.drop(columns=label_inputs),
-        y_future,
-        model_name="XGBoost Date-Based Check Without Label Inputs",
+    X_past, X_future, y_past, y_future, _, temporal_desc = prepare_datasets(
+        features_csv=features_csv, strategy="temporal", sample_size=sample_size
     )
+    label_inputs = TRAINING["label_input_features"]
+    data_md5 = file_md5(features_csv)
 
-    # 3. Extract Feature Importances from XGBoost
-    importances = xgb_model.feature_importances_
-    feat_imp = sorted(zip(feature_names, [float(x) for x in importances]), key=lambda x: x[1], reverse=True)
+    results: Dict[str, Dict[str, Any]] = {}
+    for name, spec in MODEL_SPECS.items():
+        title = spec["title"]
+        logger.info("Training %s (%s)...", title, spec["role"])
+        model = train_model(name, X_train, y_train)
+        results[name] = {
+            "model": model,
+            "spatial": evaluate_model(model, X_test, y_test, model_name=title),
+            # Date-based check: train on earlier dates and test on later ones
+            "temporal": evaluate_model(train_model(name, X_past, y_past), X_future, y_future, model_name=f"{title} Date-Based Check"),
+            # Leakage check: the same test without the inputs the labels are calculated from
+            "temporal_no_label_inputs": evaluate_model(
+                train_model(name, X_past.drop(columns=label_inputs), y_past),
+                X_future.drop(columns=label_inputs),
+                y_future,
+                model_name=f"{title} Date-Based Check Without Label Inputs",
+            ),
+        }
 
-    # 4. Save Serialized Models & Inference Metadata
-    rf_path = output_dir / "baseline_random_forest.pkl"
-    xgb_json_path = output_dir / "xgboost_model.json"
-    xgb_pkl_path = output_dir / "xgboost_model.pkl"
-    meta_path = output_dir / "feature_metadata.json"
+    best_name = select_best_model({name: r["temporal"]["macro_f1"] for name, r in results.items()})
+    logger.info("Best model on later dates: %s (macro F1 %.4f).", best_name, results[best_name]["temporal"]["macro_f1"])
 
-    with open(rf_path, "wb") as f:
-        pickle.dump(rf_model, f)
-
-    with open(xgb_pkl_path, "wb") as f:
-        pickle.dump(xgb_model, f)
-    xgb_model.save_model(xgb_json_path)
-
-    logger.info("Saved models to:\n  %s\n  %s\n  %s", rf_path, xgb_pkl_path, xgb_json_path)
-
-    metadata = {
+    shared_metadata = {
         "features": feature_names,
         "classes": [0, 1, 2],
         "class_labels": ["LOW", "MODERATE", "HIGH"],
         "validation_strategy": split_desc,
-        "metrics": {
-            "random_forest": rf_eval,
-            "xgboost": xgb_eval,
-        },
-        "top_features": feat_imp[:10],
         "temporal_validation": temporal_desc,
-        "temporal_metrics": {
-            "xgboost": temporal_eval,
-            "xgboost_without_label_inputs": temporal_no_label_inputs_eval,
-        },
+        "selected_model": best_name,
+        "metrics": {name: r["spatial"] for name, r in results.items()},
+        "temporal_metrics": {name: r["temporal"] for name, r in results.items()},
+        "temporal_metrics_without_label_inputs": {name: r["temporal_no_label_inputs"] for name, r in results.items()},
     }
-    with open(meta_path, "w", encoding="utf-8") as f:
-        json.dump(metadata, f, indent=2)
 
-    # 4b. Record the run in MLflow, with the metadata file naming its own run
-    tracking_metrics = {
-        "spatial_accuracy": xgb_eval["accuracy"],
-        "spatial_macro_f1": xgb_eval["macro_f1"],
-        "temporal_accuracy": temporal_eval["accuracy"],
-        "temporal_macro_f1": temporal_eval["macro_f1"],
-        "temporal_macro_f1_without_label_inputs": temporal_no_label_inputs_eval["macro_f1"],
-        "baseline_rf_spatial_macro_f1": rf_eval["macro_f1"],
-    }
-    run_id = log_training_run(
-        params={**TRAINING["xgboost"], "feature_count": len(feature_names), "train_rows": len(X_train), "temporal_split_date": SPLIT_DATE_THRESHOLD},
-        metrics=tracking_metrics,
-        tags={"data_md5": file_md5(features_csv), "validation": split_desc},
-        artifact_paths=[xgb_pkl_path, xgb_json_path],
-    )
-    metadata["mlflow_run_id"] = run_id
-    with open(meta_path, "w", encoding="utf-8") as f:
-        json.dump(metadata, f, indent=2)
-    attach_run_artifact(run_id, meta_path)
+    # Each model becomes its own MLflow run. Only the best one is kept on disk as the candidate.
+    with tempfile.TemporaryDirectory() as tmp:
+        best_dir = None
+        for name, result in results.items():
+            run_dir = Path(tmp) / name
+            run_dir.mkdir()
+            model_path = run_dir / MODEL_FILE
+            meta_path = run_dir / METADATA_FILE
+            with open(model_path, "wb") as f:
+                pickle.dump(result["model"], f)
 
-    # 5. Generate Model Evaluation Report
-    report_file = reports_dir / "model_evaluation_report.md"
+            metadata = {**shared_metadata, "model_type": name, "top_features": ranked_importances(result["model"], feature_names)[:10]}
+            with open(meta_path, "w", encoding="utf-8") as f:
+                json.dump(metadata, f, indent=2)
+
+            run_id = log_training_run(
+                params={**TRAINING[name], "model_type": name, "feature_count": len(feature_names), "train_rows": len(X_train), "temporal_split_date": SPLIT_DATE_THRESHOLD},
+                metrics={
+                    "spatial_accuracy": result["spatial"]["accuracy"],
+                    "spatial_macro_f1": result["spatial"]["macro_f1"],
+                    "temporal_accuracy": result["temporal"]["accuracy"],
+                    "temporal_macro_f1": result["temporal"]["macro_f1"],
+                    "temporal_macro_f1_without_label_inputs": result["temporal_no_label_inputs"]["macro_f1"],
+                },
+                tags={"model_type": name, "role": MODEL_SPECS[name]["role"], "selected": str(name == best_name).lower(), "data_md5": data_md5, "validation": split_desc},
+                artifact_paths=[model_path],
+                run_name=name,
+            )
+            # The metadata names its own run, so it can only be attached once the run exists.
+            metadata["mlflow_run_id"] = run_id
+            with open(meta_path, "w", encoding="utf-8") as f:
+                json.dump(metadata, f, indent=2)
+            attach_run_artifact(run_id, meta_path)
+
+            if name == best_name:
+                shutil.copy2(model_path, output_dir / MODEL_FILE)
+                shutil.copy2(meta_path, output_dir / METADATA_FILE)
+                best_dir = output_dir
+
+    write_evaluation_report(reports_dir / "model_evaluation_report.md", results, best_name, feature_names, split_desc, temporal_desc, len(X_train), len(X_test))
+    return best_dir / MODEL_FILE
+
+
+def write_evaluation_report(
+    report_file: Path,
+    results: Dict[str, Dict[str, Any]],
+    best_name: str,
+    feature_names: List[str],
+    split_desc: str,
+    temporal_desc: str,
+    train_rows: int,
+    test_rows: int,
+) -> None:
+    """Write the comparison of all models, with details for the selected one."""
+    best = results[best_name]
+    matrix = best["spatial"]["confusion_matrix"]
     lines = [
-        "# AgroScope Phase 12 — Model Training & Evaluation Report",
+        "# AgroScope Model Evaluation Report",
         "",
-        "## 1. Validation Strategy",
-        f"- **Method:** {split_desc}",
-        f"- **Train Observations:** `{len(X_train):,}`",
-        f"- **Holdout Test Observations:** `{len(X_test):,}`",
-        "- **Known Limitation:** Labels are calculated from `ndwi_mean`, `rainfall_8day` and `et0_8day_sum`, which are also model inputs. These scores show how well the model reproduces that formula, not real-world accuracy.",
+        "## Validation",
+        f"- **Unseen cells:** {split_desc}",
+        f"- **Later dates:** {temporal_desc}",
+        f"- **Unseen-cell rows:** `{train_rows:,}` train, `{test_rows:,}` test",
+        "- **Known limitation:** labels are calculated from `ndwi_mean`, `rainfall_8day` and `et0_8day_sum`, which are also model inputs. These scores show how well a model reproduces that formula, not real-world accuracy. The last score column removes those inputs.",
         "",
-        "---",
+        "## Model comparison (macro F1)",
         "",
-        "## 2. Model Performance Benchmarks",
-        "",
-        "| Model | Accuracy | Macro F1 | Weighted F1 | ROC-AUC (OvR) | Low Recall | Mod Recall | High Recall |",
-        "|:---|:---|:---|:---|:---|:---|:---|:---|",
-        f"| **Random Forest Baseline** | **{rf_eval['accuracy']*100:.2f}%** | {rf_eval['macro_f1']} | {rf_eval['weighted_f1']} | {rf_eval['roc_auc_ovr']} | {rf_eval['classification_report']['0: LOW']['recall']*100:.1f}% | {rf_eval['classification_report']['1: MODERATE']['recall']*100:.1f}% | {rf_eval['classification_report']['2: HIGH']['recall']*100:.1f}% |",
-        f"| **XGBoost Classifier (Main)** | **{xgb_eval['accuracy']*100:.2f}%** | {xgb_eval['macro_f1']} | {xgb_eval['weighted_f1']} | {xgb_eval['roc_auc_ovr']} | {xgb_eval['classification_report']['0: LOW']['recall']*100:.1f}% | {xgb_eval['classification_report']['1: MODERATE']['recall']*100:.1f}% | {xgb_eval['classification_report']['2: HIGH']['recall']*100:.1f}% |",
-        "",
-        "---",
-        "",
-        "## 3. Confusion Matrix (XGBoost Classifier)",
-        "",
-        "| Actual \\ Predicted | Predicted LOW | Predicted MODERATE | Predicted HIGH |",
-        "|:---|:---|:---|:---|",
-        f"| **Actual LOW** | `{xgb_eval['confusion_matrix'][0][0]:,}` | `{xgb_eval['confusion_matrix'][0][1]:,}` | `{xgb_eval['confusion_matrix'][0][2]:,}` |",
-        f"| **Actual MODERATE** | `{xgb_eval['confusion_matrix'][1][0]:,}` | `{xgb_eval['confusion_matrix'][1][1]:,}` | `{xgb_eval['confusion_matrix'][1][2]:,}` |",
-        f"| **Actual HIGH** | `{xgb_eval['confusion_matrix'][2][0]:,}` | `{xgb_eval['confusion_matrix'][2][1]:,}` | `{xgb_eval['confusion_matrix'][2][2]:,}` |",
-        "",
-        "---",
-        "",
-        "## 4. Top Predictive Features (XGBoost Gain)",
-        "",
-        "| Rank | Feature | Relative Importance | Domain Meaning |",
-        "|:---|:---|:---|:---|",
+        "| Model | Role | Unseen cells | Later dates | Later dates without label inputs |",
+        "| :--- | :--- | :--- | :--- | :--- |",
     ]
-
-    for rank, (feat, imp) in enumerate(feat_imp[:10], start=1):
-        meaning = "Satellite Canopy Water" if "ndwi" in feat else ("Vegetation Vigor" if "ndvi" in feat or "evi" in feat else "Weather / Evaporative Demand")
-        lines.append(f"| {rank} | `{feat}` | `{imp:.4f}` | {meaning} |")
-
-    lines.extend([
+    for name, result in results.items():
+        marker = " **(selected)**" if name == best_name else ""
+        lines.append(
+            f"| {MODEL_SPECS[name]['title']}{marker} | {MODEL_SPECS[name]['role']} | {result['spatial']['macro_f1']} "
+            f"| {result['temporal']['macro_f1']} | {result['temporal_no_label_inputs']['macro_f1']} |"
+        )
+    lines += [
         "",
-        "---",
+        f"The candidate is chosen on the later-dates score: {MODEL_SPECS[best_name]['title']}.",
         "",
-        "## 5. Model Artifacts Ready for API Deployment",
-        f"- `{xgb_pkl_path.name}` & `{xgb_json_path.name}` — Optimized multi-class classifier ready for FastAPI containerization.",
-        f"- `{meta_path.name}` — Schema and feature expectations for payload validation.",
-    ])
+        f"## Confusion matrix on unseen cells ({MODEL_SPECS[best_name]['title']})",
+        "",
+        "| Actual \\ Predicted | LOW | MODERATE | HIGH |",
+        "| :--- | :--- | :--- | :--- |",
+    ]
+    for label, row in zip(("LOW", "MODERATE", "HIGH"), matrix):
+        lines.append(f"| **{label}** | `{row[0]:,}` | `{row[1]:,}` | `{row[2]:,}` |")
+    lines += [
+        "",
+        f"## Top features ({MODEL_SPECS[best_name]['title']})",
+        "",
+        "| Rank | Feature | Share of importance |",
+        "| :--- | :--- | :--- |",
+    ]
+    for rank, (feature, importance) in enumerate(ranked_importances(best["model"], feature_names)[:10], start=1):
+        lines.append(f"| {rank} | `{feature}` | `{importance:.4f}` |")
 
     with open(report_file, "w", encoding="utf-8") as f:
-        f.write("\n".join(lines))
-
+        f.write("\n".join(lines) + "\n")
     logger.info("Evaluation report saved to: %s", report_file)
-
-    # Print summary highlights
-    print("\n" + "=" * 75)
-    print("AGROSCOPE PHASE 10 & 11 — MODEL TRAINING SUMMARY")
-    print("=" * 75)
-    print(f"Validation Strategy:     {split_desc}")
-    print("-" * 75)
-    print("Random Forest Baseline:")
-    print(f"  Accuracy:              {rf_eval['accuracy']*100:.2f}%")
-    print(f"  Macro F1 Score:        {rf_eval['macro_f1']:.4f}")
-    print(f"  Multi-class ROC-AUC:   {rf_eval['roc_auc_ovr']:.4f}")
-    print("XGBoost Classifier (Main):")
-    print(f"  Accuracy:              {xgb_eval['accuracy']*100:.2f}%")
-    print(f"  Macro F1 Score:        {xgb_eval['macro_f1']:.4f}")
-    print(f"  Multi-class ROC-AUC:   {xgb_eval['roc_auc_ovr']:.4f}")
-    print("-" * 75)
-    print("Top 5 Predictive Features (Satellite & Climate Interaction):")
-    for f_name, f_val in feat_imp[:5]:
-        print(f"  {f_name:<22}: {f_val:.4f}")
-    print("=" * 75 + "\n")
-
-    return xgb_pkl_path
 
 
 def parse_args() -> argparse.Namespace:

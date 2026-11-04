@@ -10,7 +10,7 @@ import hashlib
 import os
 import sys
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 import mlflow
 from dotenv import load_dotenv
@@ -59,10 +59,11 @@ def log_training_run(
     metrics: Dict[str, float],
     tags: Dict[str, str],
     artifact_paths: List[Path],
+    run_name: Optional[str] = None,
 ) -> str:
     """Record a training run with its settings, scores, data version and model files."""
     get_client()
-    with mlflow.start_run() as run:
+    with mlflow.start_run(run_name=run_name) as run:
         mlflow.log_params(params)
         mlflow.log_metrics(metrics)
         mlflow.set_tags(tags)

@@ -13,6 +13,22 @@ stages:
     outs:
       - data/raw/weather/daily_weather.csv
 
+  validate_raw:
+    cmd: python src/validation/validate_data.py --stage raw
+    params:
+      - configs/settings.yaml:
+          - validation
+          - weather.start_date
+          - weather.end_date
+    deps:
+      - src/config.py
+      - src/validation/validate_data.py
+      - data/raw/weather/daily_weather.csv
+      - data/raw/satellite/scenes_manifest.csv
+    outs:
+      - reports/validation_raw.json:
+          cache: false
+
   preprocess_satellite:
     cmd: python src/preprocessing/preprocess_bands.py
     params:
@@ -26,6 +42,7 @@ stages:
       - src/preprocessing/preprocess_bands.py
       - data/raw/study_area/command_area.geojson
       - data/raw/satellite
+      - reports/validation_raw.json
     outs:
       - data/processed/spatial_grid_250m.geojson
       - data/processed/satellite_grid_features.csv
@@ -44,6 +61,22 @@ stages:
       - data/processed/target_labels.csv
       - data/features/features.csv
 
+  validate_features:
+    cmd: python src/validation/validate_data.py --stage features
+    params:
+      - configs/settings.yaml:
+          - validation
+          - training.features
+          - training.target_column
+          - training.temporal_split_date
+    deps:
+      - src/config.py
+      - src/validation/validate_data.py
+      - data/features/features.csv
+    outs:
+      - reports/validation_features.json:
+          cache: false
+
   train_evaluate:
     cmd: python src/training/train.py
     params:
@@ -54,11 +87,23 @@ stages:
       - src/training/train.py
       - src/training/tracking.py
       - data/features/features.csv
+      - reports/validation_features.json
     outs:
-      - models/candidate/xgboost_model.pkl
-      - models/candidate/xgboost_model.json
-      - models/candidate/baseline_random_forest.pkl
+      - models/candidate/model.pkl
       - models/candidate/feature_metadata.json
+
+  evaluate_model:
+    cmd: python src/training/evaluate.py
+    params:
+      - configs/settings.yaml:
+          - promotion
+    deps:
+      - src/config.py
+      - src/training/evaluate.py
+      - models/candidate/feature_metadata.json
+    outs:
+      - reports/evaluation_result.json:
+          cache: false
 
   promote_model:
     cmd: python src/training/promote.py
@@ -70,11 +115,11 @@ stages:
       - src/config.py
       - src/training/promote.py
       - src/training/tracking.py
-      - models/candidate/xgboost_model.pkl
+      - models/candidate/model.pkl
       - models/candidate/feature_metadata.json
+      - reports/evaluation_result.json
     outs:
-      - models/xgboost_model.pkl
-      - models/xgboost_model.json
+      - models/model.pkl
       - models/feature_metadata.json
       - reports/promotion_decision.json:
           cache: false
@@ -91,7 +136,7 @@ stages:
       - src/inference/predict.py
       - src/inference/explainability.py
       - src/advisory/advisory_engine.py
-      - models/xgboost_model.pkl
+      - models/model.pkl
       - models/feature_metadata.json
       - data/features/features.csv
       - data/processed/spatial_grid_250m.geojson

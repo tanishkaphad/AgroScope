@@ -2,7 +2,7 @@
 
 Implements Phase 12 of the AgroScope workflow:
 1. Explains why a spatial cell or region was predicted as stressed.
-2. Uses TreeExplainer to compute exact feature attributions for multi-class XGBoost.
+2. Uses TreeExplainer to compute exact feature attributions for the multi-class tree models.
 3. Generates global SHAP summary visualizations for reports/figures/shap_summary.png.
 4. Returns local feature contribution breakdowns for on-demand FastAPI /area/{id} endpoint queries.
 """
@@ -65,7 +65,7 @@ class ModelExplainer:
         metadata_path: Optional[Path] = None,
     ) -> None:
         base_dir = Path(__file__).resolve().parent.parent.parent
-        self.model_path = model_path or (base_dir / "models" / "xgboost_model.pkl")
+        self.model_path = model_path or (base_dir / "models" / "model.pkl")
         self.metadata_path = metadata_path or (base_dir / "models" / "feature_metadata.json")
 
         if not self.model_path.exists():
@@ -163,7 +163,7 @@ class ModelExplainer:
                     "summary": f"{arrow} {FEATURE_EXPLANATIONS.get(feat_name, feat_name)} ({val:.2f}) — Contributes {pct_contrib}% to {pred_label}",
                 })
         else:
-            # Fallback heuristic using XGBoost feature importances & standardized deviation
+            # Fallback heuristic using the model's feature importances & standardized deviation
             importances = getattr(self.model, "feature_importances_", np.ones(len(self.feature_names)))
             ranked_indices = np.argsort(importances)[::-1][:top_k]
             total_imp = np.sum(importances[ranked_indices]) or 1.0

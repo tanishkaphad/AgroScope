@@ -1,0 +1,44 @@
+{
+  "stage": "features",
+  "passed": true,
+  "rows": {
+    "features": 566319
+  },
+  "checks": [
+    {
+      "check": "required_columns",
+      "passed": true,
+      "detail": "All present"
+    },
+    {
+      "check": "value_ranges",
+      "passed": true,
+      "detail": "14 columns within range"
+    },
+    {
+      "check": "missing_values",
+      "passed": true,
+      "detail": "All within 1.0%"
+    },
+    {
+      "check": "label_values",
+      "passed": true,
+      "detail": "Labels are 0, 1 and 2"
+    },
+    {
+      "check": "one_row_per_cell_and_date",
+      "passed": true,
+      "detail": "0 duplicates"
+    },
+    {
+      "check": "date_coverage",
+      "passed": true,
+      "detail": "27 dates: 15 before 2024-02-01, 12 from it onwards"
+    },
+    {
+      "check": "all_classes_in_later_dates",
+      "passed": true,
+      "detail": "3 of 3 classes"
+    }
+  ]
+}

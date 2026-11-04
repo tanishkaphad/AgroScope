@@ -1,7 +1,7 @@
 """AgroScope Inference & Geospatial Prediction Pipeline.
 
 Implements Phases 13, 14, 15, and 16 of the AgroScope workflow:
-1. Loads production XGBoost model from models/xgboost_model.pkl.
+1. Loads the production model from models/model.pkl.
 2. Performs batch inference over all 250m spatial units for any 8-day satellite cycle.
 3. Attaches rule-based irrigation priority advisories (Priority 1, 2, 3).
 4. Generates query-ready geospatial GeoJSONs:
@@ -52,7 +52,7 @@ class AgroScopePredictor:
         metadata_path: Optional[Path] = None,
     ) -> None:
         base_dir = Path(__file__).resolve().parent.parent.parent
-        self.model_path = model_path or (base_dir / "models" / "xgboost_model.pkl")
+        self.model_path = model_path or (base_dir / "models" / "model.pkl")
         self.metadata_path = metadata_path or (base_dir / "models" / "feature_metadata.json")
 
         if not self.model_path.exists():

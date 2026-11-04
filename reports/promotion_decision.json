@@ -1,11 +1,13 @@
 {
-  "evaluated_at": "2026-11-04T04:50:24.642095+00:00",
+  "evaluated_at": "2026-11-04T09:45:25.021423+00:00",
   "metric": "temporal_macro_f1",
-  "candidate_version": 2,
-  "candidate_score": 0.9176,
-  "previous_champion_version": 1,
-  "previous_champion_score": 0.9176,
+  "min_score": 0.85,
+  "candidate_model": "lightgbm",
+  "candidate_version": 1,
+  "candidate_score": 0.9242,
+  "previous_champion_version": null,
+  "previous_champion_score": null,
   "promoted": true,
-  "reason": "Candidate 0.9176 meets the required 0.9176.",
-  "active_version": 2
+  "reason": "No champion exists yet.",
+  "active_version": 1
 }
