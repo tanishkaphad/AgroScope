@@ -1,33 +1,44 @@
 import React, { useState } from 'react';
-import { Play, RotateCcw, Sliders, Sparkles, Thermometer, Umbrella, Wind, Zap } from 'lucide-react';
+import { CheckSquare, RotateCcw, Sliders, Zap } from 'lucide-react';
+import { errorText } from '../i18n';
 import { runPredict } from '../services/api';
 
-export default function PredictionStudio({ currentLang = 'en', initialValues = null }) {
-  const [ndvi, setNdvi] = useState(initialValues?.ndvi ?? 0.28);
-  const [ndwi, setNdwi] = useState(initialValues?.ndwi ?? 0.04);
-  const [tempMax, setTempMax] = useState(34.0);
-  const [rainfall, setRainfall] = useState(0.0);
-  const [et0, setEt0] = useState(36.0);
+const DEFAULTS = { ndvi: 0.28, ndwi: 0.04, tempMax: 34.0, rainfall: 0.0 };
+const ET0_8DAY_DEFAULT = 36.0;
 
+const SLIDERS = [
+  { key: 'ndwi', label: 'simNdwi', min: -0.25, max: 0.25, step: 0.01, format: (v) => Number(v).toFixed(2) },
+  { key: 'ndvi', label: 'simNdvi', min: 0.05, max: 0.75, step: 0.01, format: (v) => Number(v).toFixed(2) },
+  { key: 'tempMax', label: 'simTemp', min: 22, max: 46, step: 0.5, format: (v, t) => `${v}${t.unitCelsius}` },
+  { key: 'rainfall', label: 'simRain', min: 0, max: 80, step: 1, format: (v, t) => `${v} ${t.unitMm}` },
+];
+
+export default function PredictionStudio({ currentLang = 'en', t, initialValues = null }) {
+  const [values, setValues] = useState({
+    ...DEFAULTS,
+    ndvi: initialValues?.ndvi ?? DEFAULTS.ndvi,
+    ndwi: initialValues?.ndwi ?? DEFAULTS.ndwi,
+  });
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
+
+  // The API sends the advice in every language, so a result already shown follows the language button.
+  const advice = (field) => result?.advisory?.translations?.[field]?.[currentLang] ?? result?.advisory?.[field];
 
   const handleRunInference = async () => {
     setLoading(true);
     setError(null);
     setResult(null);
-    const payload = {
-      ndvi_mean: parseFloat(ndvi),
-      ndwi_mean: parseFloat(ndwi),
-      temp_max_c: parseFloat(tempMax),
-      rainfall_8day: parseFloat(rainfall),
-      et0_8day_sum: parseFloat(et0),
-      lang: currentLang,
-    };
-
     try {
-      setResult(await runPredict(payload));
+      setResult(await runPredict({
+        ndvi_mean: parseFloat(values.ndvi),
+        ndwi_mean: parseFloat(values.ndwi),
+        temp_max_c: parseFloat(values.tempMax),
+        rainfall_8day: parseFloat(values.rainfall),
+        et0_8day_sum: ET0_8DAY_DEFAULT,
+        lang: currentLang,
+      }));
     } catch (err) {
       setError(err.message);
     } finally {
@@ -36,11 +47,7 @@ export default function PredictionStudio({ currentLang = 'en', initialValues = n
   };
 
   const handleReset = () => {
-    setNdvi(0.28);
-    setNdwi(0.04);
-    setTempMax(34.0);
-    setRainfall(0.0);
-    setEt0(36.0);
+    setValues(DEFAULTS);
     setResult(null);
     setError(null);
   };
@@ -49,129 +56,68 @@ export default function PredictionStudio({ currentLang = 'en', initialValues = n
     <div className="sidebar-card" id="prediction-studio-card">
       <div className="card-title-group">
         <h2>
-          <Sliders size={17} color="var(--brand-cyan)" />
-          <span>What-If Stress Simulator</span>
+          <Sliders size={17} aria-hidden="true" />
+          <span>{t.simTitle}</span>
         </h2>
-        <button
-          type="button"
-          className="icon-btn"
-          onClick={handleReset}
-          title="Reset parameters to command area averages"
-          id="sim-reset-btn"
-        >
-          <RotateCcw size={13} />
+        <button type="button" className="icon-btn" onClick={handleReset} title={t.simReset} aria-label={t.simReset} id="sim-reset-btn">
+          <RotateCcw size={13} aria-hidden="true" />
         </button>
       </div>
 
-      <p style={{ fontSize: '0.76rem', color: 'var(--text-secondary)', marginBottom: '1rem', lineHeight: 1.4 }}>
-        Adjust satellite & meteorological variables to simulate crop water stress response under drought or heatwaves.
-      </p>
+      <p className="sim-intro">{t.simIntro}</p>
 
-      {/* Sliders */}
-      <div className="sim-slider-group">
-        <div className="slider-label-row">
-          <span>NDWI (Canopy Water Content)</span>
-          <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--brand-cyan)' }}>{Number(ndwi).toFixed(2)}</span>
+      {SLIDERS.map(({ key, label, min, max, step, format }) => (
+        <div className="sim-slider-group" key={key}>
+          <div className="slider-label-row">
+            <label htmlFor={`sim-slider-${key}`}>{t[label]}</label>
+            <span className="slider-value">{format(values[key], t)}</span>
+          </div>
+          <input
+            type="range"
+            min={min}
+            max={max}
+            step={step}
+            value={values[key]}
+            onChange={(e) => setValues((current) => ({ ...current, [key]: e.target.value }))}
+            className="slider-input"
+            id={`sim-slider-${key}`}
+          />
         </div>
-        <input
-          type="range"
-          min="-0.25"
-          max="0.25"
-          step="0.01"
-          value={ndwi}
-          onChange={(e) => setNdwi(e.target.value)}
-          className="slider-input"
-          id="sim-slider-ndwi"
-        />
-      </div>
+      ))}
 
-      <div className="sim-slider-group">
-        <div className="slider-label-row">
-          <span>NDVI (Vegetation Greenness)</span>
-          <span style={{ fontFamily: 'var(--font-mono)', color: '#34d399' }}>{Number(ndvi).toFixed(2)}</span>
-        </div>
-        <input
-          type="range"
-          min="0.05"
-          max="0.75"
-          step="0.01"
-          value={ndvi}
-          onChange={(e) => setNdvi(e.target.value)}
-          className="slider-input"
-          id="sim-slider-ndvi"
-        />
-      </div>
-
-      <div className="sim-slider-group">
-        <div className="slider-label-row">
-          <span>Peak Temperature (°C)</span>
-          <span style={{ fontFamily: 'var(--font-mono)', color: '#f87171' }}>{tempMax}°C</span>
-        </div>
-        <input
-          type="range"
-          min="22"
-          max="46"
-          step="0.5"
-          value={tempMax}
-          onChange={(e) => setTempMax(e.target.value)}
-          className="slider-input"
-          id="sim-slider-temp"
-        />
-      </div>
-
-      <div className="sim-slider-group">
-        <div className="slider-label-row">
-          <span>8-Day Rainfall (mm)</span>
-          <span style={{ fontFamily: 'var(--font-mono)', color: '#38bdf8' }}>{rainfall} mm</span>
-        </div>
-        <input
-          type="range"
-          min="0"
-          max="80"
-          step="1"
-          value={rainfall}
-          onChange={(e) => setRainfall(e.target.value)}
-          className="slider-input"
-          id="sim-slider-rain"
-        />
-      </div>
-
-      <button
-        type="button"
-        className="primary-action-btn"
-        onClick={handleRunInference}
-        disabled={loading}
-        id="run-simulation-btn"
-      >
-        <Zap size={16} />
-        <span>{loading ? 'Evaluating Model...' : 'Run Simulation'}</span>
+      <button type="button" className="primary-action-btn" onClick={handleRunInference} disabled={loading} id="run-simulation-btn">
+        <Zap size={16} aria-hidden="true" />
+        <span>{loading ? t.simRunning : t.simRun}</span>
       </button>
 
       {error && (
-        <div className="data-error-banner" role="alert" style={{ margin: '1rem 0 0' }}>
-          <span>{error}</span>
+        <div className="data-error-banner modal-error" role="alert">
+          <span>{errorText(error, t)}</span>
         </div>
       )}
 
-      {/* Inference Result Box */}
       {result && (
-        <div style={{ marginTop: '1.25rem', animation: 'fadeIn 0.25s ease-out' }}>
-          <div className="parcel-meta-header" style={{ borderColor: result.advisory?.color || 'var(--brand-cyan)' }}>
+        <div className="sim-result fade-in" aria-live="polite">
+          <div className="parcel-meta-header">
             <div className="parcel-id-row">
-              <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#fff' }}>SIMULATED PREDICTION</span>
+              <span className="sim-result-title">{t.simResult}</span>
               <span className={`stress-badge-pill ${result.predicted_class?.toLowerCase()}`}>
-                {result.predicted_class} ({Math.round(result.confidence * 100)}%)
+                {t.stressBadge(t.stress[result.predicted_class] ?? result.predicted_class, Math.round(result.confidence * 100))}
               </span>
             </div>
-            <div style={{ fontSize: '0.78rem', marginTop: '0.35rem', color: result.advisory?.color, fontWeight: 700 }}>
-              {result.advisory?.title}
-            </div>
-            <div style={{ fontSize: '0.75rem', marginTop: '0.25rem', color: 'var(--text-secondary)' }}>
-              {result.advisory?.recommendation}
-            </div>
-            <div style={{ fontSize: '0.72rem', marginTop: '0.5rem', color: 'var(--text-muted)' }}>
-              {result.note}
-            </div>
+            <div className="advisory-urgency">{advice('urgency')}</div>
+            <div className="advisory-title">{advice('title')}</div>
+            <div className="advisory-rec">{advice('recommendation')}</div>
+            <h3 className="status-subheading">{t.actionSteps}</h3>
+            <ul className="action-steps-list">
+              {(advice('actionable_steps') || []).map((step) => (
+                <li key={step} className="action-step-item">
+                  <CheckSquare size={13} className="action-step-icon" aria-hidden="true" />
+                  <span>{step}</span>
+                </li>
+              ))}
+            </ul>
+            <p className="status-note">{t.simNote}</p>
           </div>
         </div>
       )}

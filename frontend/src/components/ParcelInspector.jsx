@@ -1,168 +1,186 @@
 import React, { useEffect, useState } from 'react';
-import { AlertCircle, CheckSquare, Droplet, HelpCircle, MapPin, Sliders, Sparkles } from 'lucide-react';
+import { CheckSquare, MapPin, Sliders, Sparkles } from 'lucide-react';
+import { errorText, formatDate } from '../i18n';
 import { fetchParcelDetail } from '../services/api';
 
-export default function ParcelInspector({
-  selectedParcel,
-  currentLang = 'en',
-  onSendToSimulator,
-}) {
-  const [detail, setDetail] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+function CardTitle({ t, children }) {
+  return (
+    <div className="card-title-group">
+      <h2>
+        <MapPin size={17} aria-hidden="true" />
+        <span>{t.tabDetails}</span>
+      </h2>
+      {children}
+    </div>
+  );
+}
+
+// Map cells can't take keyboard focus, so this is the keyboard route to a cell's details.
+function CellLookup({ t, onSelectParcel }) {
+  const [cellId, setCellId] = useState('');
+
+  const handleSubmit = (event) => {
+    event.preventDefault();
+    const trimmed = cellId.trim();
+    if (trimmed) onSelectParcel({ cell_id: trimmed });
+  };
+
+  return (
+    <form className="cell-lookup" onSubmit={handleSubmit}>
+      <label htmlFor="cell-lookup-input">{t.cellLookup}</label>
+      <div className="cell-lookup-row">
+        <input
+          id="cell-lookup-input"
+          type="text"
+          placeholder="NLBC_CELL_0008"
+          value={cellId}
+          onChange={(e) => setCellId(e.target.value)}
+          autoComplete="off"
+          spellCheck="false"
+        />
+        <button type="submit" className="layer-btn" id="cell-lookup-btn">{t.cellLookupButton}</button>
+      </div>
+    </form>
+  );
+}
+
+function DetailSkeleton() {
+  return (
+    <div aria-hidden="true">
+      <div className="parcel-meta-header">
+        <span className="skeleton skeleton-text" style={{ width: '55%', marginBottom: '0.6rem' }} />
+        <span className="skeleton skeleton-text" style={{ width: '85%' }} />
+      </div>
+      <div className="advisory-box">
+        <span className="skeleton skeleton-text" style={{ width: '35%', marginBottom: '0.5rem' }} />
+        <span className="skeleton skeleton-text" style={{ width: '70%', marginBottom: '0.5rem' }} />
+        <span className="skeleton skeleton-text" style={{ width: '95%', marginBottom: '0.4rem' }} />
+        <span className="skeleton skeleton-text" style={{ width: '90%' }} />
+      </div>
+    </div>
+  );
+}
+
+export default function ParcelInspector({ selectedParcel, currentLang = 'en', date, t, onSelectParcel, onSendToSimulator }) {
+  const [loaded, setLoaded] = useState({ key: null, detail: null, error: null });
+
+  const cellId = selectedParcel?.cell_id;
+  const requestKey = cellId ? `${cellId}|${currentLang}|${date}` : null;
+  const isLoading = requestKey !== null && loaded.key !== requestKey;
 
   useEffect(() => {
-    if (!selectedParcel || !selectedParcel.cell_id) {
-      setDetail(null);
-      return;
-    }
+    if (!requestKey) return undefined;
 
     let isMounted = true;
-    setLoading(true);
-    setError(null);
-
-    fetchParcelDetail(selectedParcel.cell_id, currentLang)
-      .then((res) => {
-        if (isMounted) setDetail(res);
-      })
-      .catch((err) => {
-        if (isMounted) {
-          setDetail(null);
-          setError(err.message);
-        }
-      })
-      .finally(() => {
-        if (isMounted) setLoading(false);
-      });
+    fetchParcelDetail(cellId, currentLang, date)
+      .then((detail) => isMounted && setLoaded({ key: requestKey, detail, error: null }))
+      .catch((err) => isMounted && setLoaded({ key: requestKey, detail: null, error: err.message }));
 
     return () => {
       isMounted = false;
     };
-  }, [selectedParcel, currentLang]);
+  }, [requestKey, cellId, currentLang, date]);
 
   if (!selectedParcel) {
     return (
       <div className="sidebar-card" id="parcel-inspector-card">
-        <div className="card-title-group">
-          <h2>
-            <MapPin size={17} color="var(--brand-cyan)" />
-            <span>Parcel Inspector</span>
-          </h2>
-        </div>
+        <CardTitle t={t} />
         <div className="inspector-empty">
-          <div className="inspector-empty-icon">🛰️</div>
-          <p style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>No Parcel Selected</p>
-          <p style={{ fontSize: '0.78rem', marginTop: '0.4rem', lineHeight: 1.4 }}>
-            Click a 250m grid cell on the map to see its water stress estimate and irrigation advice.
-          </p>
+          <div className="inspector-empty-icon" aria-hidden="true">🛰️</div>
+          <p className="inspector-empty-title">{t.noCell}</p>
+          <p className="inspector-empty-help">{t.noCellHelp}</p>
         </div>
+        <CellLookup t={t} onSelectParcel={onSelectParcel} />
       </div>
     );
   }
 
-  if (loading || error || !detail) {
+  if (isLoading) {
+    return (
+      <div className="sidebar-card" id="parcel-inspector-card" aria-busy="true">
+        <CardTitle t={t} />
+        <DetailSkeleton />
+      </div>
+    );
+  }
+
+  if (loaded.error || !loaded.detail) {
     return (
       <div className="sidebar-card" id="parcel-inspector-card">
-        <div className="card-title-group">
-          <h2>
-            <MapPin size={17} color="var(--brand-cyan)" />
-            <span>Parcel Inspector</span>
-          </h2>
+        <CardTitle t={t} />
+        <div className="inspector-empty" role="alert">
+          <p className="inspector-empty-title">{t.loadCellError}</p>
+          <p className="inspector-empty-help">{errorText(loaded.error, t)}</p>
+          <button type="button" className="layer-btn banner-retry" onClick={() => setLoaded({ key: null, detail: null, error: null })} id="cell-retry-btn">
+            {t.retry}
+          </button>
         </div>
-        <div className="inspector-empty" role={error ? 'alert' : undefined}>
-          <p style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>
-            {error ? "Couldn't load this parcel" : 'Loading parcel...'}
-          </p>
-          {error && <p style={{ fontSize: '0.78rem', marginTop: '0.4rem', lineHeight: 1.4 }}>{error}</p>}
-        </div>
+        <CellLookup t={t} onSelectParcel={onSelectParcel} />
       </div>
     );
   }
 
+  const { detail } = loaded;
   const stressClass = detail.water_stress.class;
-  const confidence = detail.water_stress.confidence;
   const advisory = detail.irrigation_advisory;
   const keyDrivers = detail.key_drivers;
   const { ndvi, ndwi } = detail.canopy_indices;
-
   const pClass = advisory.priority === 1 ? 'p1' : advisory.priority === 3 ? 'p3' : 'p2';
 
   return (
-    <div className="sidebar-card" id="parcel-inspector-card">
-      <div className="card-title-group">
-        <h2>
-          <MapPin size={17} color="var(--brand-cyan)" />
-          <span>Parcel Inspector</span>
-        </h2>
+    <div className="sidebar-card fade-in" id="parcel-inspector-card">
+      <CardTitle t={t}>
         {onSendToSimulator && (
-          <button
-            type="button"
-            className="layer-btn"
-            style={{ fontSize: '0.72rem', padding: '0.25rem 0.5rem' }}
-            onClick={() => onSendToSimulator(selectedParcel)}
-            title="Simulate what-if changes for this cell"
-          >
-            <Sliders size={12} />
-            <span>Simulate</span>
+          <button type="button" className="layer-btn" onClick={() => onSendToSimulator(selectedParcel)} title={t.simulateHelp}>
+            <Sliders size={12} aria-hidden="true" />
+            <span>{t.simulate}</span>
           </button>
         )}
-      </div>
+      </CardTitle>
 
-      {/* Meta Header */}
       <div className="parcel-meta-header">
         <div className="parcel-id-row">
-          <span className="parcel-id">{selectedParcel.cell_id}</span>
+          <span className="parcel-id">{cellId}</span>
           <span className={`stress-badge-pill ${stressClass.toLowerCase()}`}>
-            {stressClass} STRESS ({Math.round(confidence * 100)}%)
+            {t.stressBadge(t.stress[stressClass] ?? stressClass, Math.round(detail.water_stress.confidence * 100))}
           </span>
         </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.74rem', color: 'var(--text-muted)' }}>
-          <span>Crop: {detail.crop_type ?? 'Not available'} | Date: {detail.date}</span>
-          <span>NDVI: {ndvi.toFixed(2)} | NDWI: {ndwi.toFixed(2)}</span>
+        <div className="parcel-meta-row">
+          <span>{t.crop}: {detail.crop_type ?? t.notAvailable}</span>
+          <span>{t.date}: {formatDate(detail.date, currentLang)}</span>
+          <span>NDVI {ndvi.toFixed(2)}, NDWI {ndwi.toFixed(2)}</span>
         </div>
       </div>
 
-      {/* Irrigation Advisory Box */}
       <div className={`advisory-box ${pClass}`}>
         <div className="advisory-urgency">{advisory.urgency}</div>
         <div className="advisory-title">{advisory.title}</div>
         <div className="advisory-rec">{advisory.recommendation}</div>
 
-        <div style={{ marginTop: '0.6rem' }}>
-          <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '0.4rem', textTransform: 'uppercase' }}>
-            Action Steps:
-          </div>
-          <ul className="action-steps-list">
-            {(advisory.actionable_steps || []).map((step, idx) => (
-              <li key={idx} className="action-step-item">
-                <CheckSquare size={13} color="var(--brand-cyan)" style={{ flexShrink: 0, marginTop: '2px' }} />
-                <span>{step}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
+        <h3 className="status-subheading">{t.actionSteps}</h3>
+        <ul className="action-steps-list">
+          {(advisory.actionable_steps || []).map((step) => (
+            <li key={step} className="action-step-item">
+              <CheckSquare size={13} className="action-step-icon" aria-hidden="true" />
+              <span>{step}</span>
+            </li>
+          ))}
+        </ul>
       </div>
 
-      {/* SHAP Feature Attribution Waterfall */}
       <div className="shap-container">
-        <div className="shap-header" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-          <Sparkles size={13} color="var(--brand-cyan)" />
-          <span>SHAP Key Stress Drivers</span>
+        <div className="shap-header">
+          <Sparkles size={13} aria-hidden="true" />
+          <span>{t.shapTitle}</span>
         </div>
 
-        {keyDrivers.length === 0 && (
-          <p style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>Not available for stored results yet.</p>
-        )}
+        {keyDrivers.length === 0 && <p className="status-note">{t.shapNone}</p>}
 
-        {keyDrivers.map((driver, idx) => (
-          <div key={idx} className="shap-driver-row">
+        {keyDrivers.map((driver) => (
+          <div key={driver.feature} className="shap-driver-row">
             <div className="shap-label-row">
-              <span style={{ color: 'var(--text-primary)' }}>
-                {driver.arrow} {driver.label}
-              </span>
-              <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--brand-cyan)' }}>
-                {driver.impact_pct}%
-              </span>
+              <span>{driver.arrow} {driver.label}</span>
+              <span className="shap-value">{driver.impact_pct}%</span>
             </div>
             <div className="driver-bar-bg">
               <div

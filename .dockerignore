@@ -10,6 +10,7 @@
 !data/processed/*.geojson
 !data/processed/*.json
 !data/processed/*.html
+!data/processed/cycle_results.csv
 !reports/promotion_decision.json
 !frontend/dist/**
 **/__pycache__

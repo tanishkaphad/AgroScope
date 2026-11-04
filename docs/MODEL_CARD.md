@@ -85,6 +85,7 @@ Confidence near 1.0 reflects certainty about the formula, not about the crop. Th
 
 ## Limits
 
+- **Past dates aren't a test:** the dashboard can show all 27 dates, but the model trained on 75% of cells across those dates, so most of each map repeats its training data. Use the later-dates scores above to judge the model, not these maps.
 - **One season:** the data covers one Rabi season, so monsoon and other years are untested.
 - **Little separation:** 97.2% of the vegetated area is HIGH on the published date, so it can't yet rank areas for water (B-27).
 - **Crop and soil are ignored:** every cell uses one crop coefficient of 0.95 (B-19).

@@ -3,11 +3,20 @@
  * Every function throws on failure, so the UI can show a real error.
  */
 
+import { API_UNREACHABLE } from '../i18n';
+
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
+
+export const TOOL_LINKS = [
+  { label: 'MLflow', url: import.meta.env.VITE_MLFLOW_URL || 'http://localhost:5000' },
+  { label: 'Grafana', url: import.meta.env.VITE_GRAFANA_URL || 'http://localhost:3000' },
+  { label: 'Airflow', url: import.meta.env.VITE_AIRFLOW_URL || 'http://localhost:8080' },
+  { label: 'API docs', url: `${new URL(API_BASE).origin}/docs` },
+];
 
 async function request(path, options) {
   const res = await fetch(`${API_BASE}${path}`, options).catch(() => {
-    throw new Error("Can't reach the AgroScope API.");
+    throw new Error(API_UNREACHABLE);
   });
   if (!res.ok) {
     const body = await res.json().catch(() => null);
@@ -38,24 +47,24 @@ export function fetchAvailableDates() {
   return request('/available-dates');
 }
 
-export function fetchStatistics() {
-  return request('/statistics');
+export function fetchStatistics(date) {
+  return request(`/statistics${date ? `?date=${date}` : ''}`);
 }
 
 export function fetchStudyArea() {
   return request('/study-area');
 }
 
-export function fetchStressMap(limit = 1200) {
-  return request(`/stress-map?sample=true&limit=${limit}`);
+export function fetchStressMap(limit, date) {
+  return request(`/stress-map?sample=true&limit=${limit}${date ? `&date=${date}` : ''}`);
 }
 
-export function fetchIrrigationMap(limit = 1200) {
-  return request(`/irrigation-map?sample=true&limit=${limit}`);
+export function fetchIrrigationMap(limit, date) {
+  return request(`/irrigation-map?sample=true&limit=${limit}${date ? `&date=${date}` : ''}`);
 }
 
-export function fetchParcelDetail(cellId, lang = 'en') {
-  return request(`/area/${encodeURIComponent(cellId)}?lang=${lang}`);
+export function fetchParcelDetail(cellId, lang = 'en', date) {
+  return request(`/area/${encodeURIComponent(cellId)}?lang=${lang}${date ? `&date=${date}` : ''}`);
 }
 
 export function runPredict(payload) {

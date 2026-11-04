@@ -33,28 +33,56 @@ const BASE_LAYERS = {
   },
 };
 
+// Colours chosen to stay readable on both the light street map and the dark satellite map.
+const STRESS_COLORS = { HIGH: '#dc2626', MODERATE: '#d97706', LOW: '#059669' };
+const PRIORITY_COLORS = { 1: '#dc2626', 2: '#d97706', 3: '#2563eb' };
+const BOUNDARY_COLORS = { street: '#0f4c5c', satellite: '#7dd3fc' };
+const SELECTED_OUTLINE = { street: '#111827', satellite: '#ffffff' };
+const HEADWORKS = [18.1482, 74.0485];
+
+function escapeHtml(text) {
+  const element = document.createElement('div');
+  element.textContent = text;
+  return element.innerHTML;
+}
+
+function LegendRow({ chip, label, value }) {
+  return (
+    <div className="legend-row">
+      <div className="legend-chip">
+        <span className={`chip-color ${chip}`}></span>
+        <span>{label}</span>
+      </div>
+      <span className="legend-value">{value}</span>
+    </div>
+  );
+}
+
 export default function MapContainer({
   studyAreaGeoJson,
   stressMapGeoJson,
   irrigationMapGeoJson,
   stats,
+  isLoading,
   activeLayer = 'stress',
   onLayerChange,
   onSelectParcel,
   selectedParcelId,
-  currentLang = 'en',
+  t,
 }) {
   const mapRef = useRef(null);
-  const stress = stats?.stress_breakdown;
-  const legendValue = (pct, hectares) => (
-    stress ? `${pct}% (${Math.round(hectares).toLocaleString()} ha)` : 'No data'
-  );
   const mapInstanceRef = useRef(null);
   const boundaryLayerRef = useRef(null);
   const dataLayerRef = useRef(null);
-  const selectedFeatureLayerRef = useRef(null);
+  const headworksRef = useRef(null);
 
   const [baseMap, setBaseMap] = useState('street'); // 'street' | 'satellite'
+
+  const stress = stats?.stress_breakdown;
+  const priority = stats?.irrigation_priority_breakdown;
+  const legendValue = (pct, hectares) => (
+    stats ? `${pct}% (${Math.round(hectares).toLocaleString('en-US')} ${t.unitHa})` : t.noData
+  );
 
   // Initialize Leaflet Map
   useEffect(() => {
@@ -69,35 +97,34 @@ export default function MapContainer({
     L.control.zoom({ position: 'topright' }).addTo(map);
     map.attributionControl.addAttribution('Weather: <a href="https://open-meteo.com/">Open-Meteo</a>');
 
-    // Initial base layer
     const baseTile = L.tileLayer(BASE_LAYERS.street.url, BASE_LAYERS.street.options).addTo(map);
 
     mapInstanceRef.current = map;
     mapInstanceRef.current._baseTile = baseTile;
 
-    // Headworks Marker (Veer Dam)
-    const headworksMarker = L.circleMarker([18.1482, 74.0485], {
+    headworksRef.current = L.circleMarker(HEADWORKS, {
       radius: 8,
-      fillColor: '#00f2fe',
+      fillColor: '#0f4c5c',
       color: '#ffffff',
       weight: 2,
       opacity: 1,
       fillOpacity: 0.9,
     }).addTo(map);
 
-    headworksMarker.bindPopup(`
-      <div style="font-family: sans-serif; font-size: 12px; color: #fff;">
-        <strong style="color: #00f2fe;">Veer Dam Headworks</strong><br/>
-        Nira Left Bank Canal Offtake<br/>
-        <em>Krishna-Bhima Sub-basin</em>
-      </div>
-    `);
+    // The panel changes size with the layout, and Leaflet needs telling or tiles leave gaps.
+    const observer = new ResizeObserver(() => map.invalidateSize());
+    observer.observe(mapRef.current);
 
     return () => {
+      observer.disconnect();
       map.remove();
       mapInstanceRef.current = null;
     };
   }, []);
+
+  useEffect(() => {
+    headworksRef.current?.bindPopup(`<div class="map-popup"><strong>${escapeHtml(t.headworks)}</strong><br/>${escapeHtml(t.headworksDetail)}</div>`);
+  }, [t]);
 
   // Handle Base Map Switch
   useEffect(() => {
@@ -122,18 +149,16 @@ export default function MapContainer({
     try {
       const boundaryLayer = L.geoJSON(studyAreaGeoJson, {
         style: {
-          color: '#00f2fe',
+          color: BOUNDARY_COLORS.street,
           weight: 2.5,
-          opacity: 0.85,
-          fillColor: '#00f2fe',
-          fillOpacity: 0.04,
+          opacity: 0.9,
+          fillOpacity: 0,
           dashArray: '4, 4',
         },
       }).addTo(map);
 
       boundaryLayerRef.current = boundaryLayer;
 
-      // Fit bounds initially
       const bounds = boundaryLayer.getBounds();
       if (bounds.isValid()) {
         map.fitBounds(bounds, { padding: [25, 25] });
@@ -142,6 +167,10 @@ export default function MapContainer({
       console.warn('Failed to render boundary GeoJSON:', err);
     }
   }, [studyAreaGeoJson]);
+
+  useEffect(() => {
+    boundaryLayerRef.current?.setStyle({ color: BOUNDARY_COLORS[baseMap] });
+  }, [baseMap, studyAreaGeoJson]);
 
   // Render Data Layer (Stress Map or Irrigation Priority)
   useEffect(() => {
@@ -159,32 +188,26 @@ export default function MapContainer({
       const dataLayer = L.geoJSON(geoData, {
         style: (feature) => {
           const props = feature.properties || {};
-          let color = props.fill_color || '#ffc107';
-
-          if (activeLayer === 'priority') {
-            const p = props.priority || 2;
-            color = p === 1 ? '#dc2626' : p === 2 ? '#f59e0b' : '#3b82f6';
-          } else {
-            const sc = props.stress_class || 'MODERATE';
-            color = sc === 'HIGH' ? '#ef4444' : sc === 'LOW' ? '#10b981' : '#f59e0b';
-          }
-
+          const color = activeLayer === 'priority'
+            ? PRIORITY_COLORS[props.priority] ?? PRIORITY_COLORS[2]
+            : STRESS_COLORS[props.stress_class] ?? STRESS_COLORS.MODERATE;
           const isSelected = props.cell_id === selectedParcelId;
 
           return {
-            color: isSelected ? '#ffffff' : color,
+            color: isSelected ? SELECTED_OUTLINE[baseMap] : color,
             weight: isSelected ? 3 : 0.8,
-            opacity: isSelected ? 1 : 0.65,
+            opacity: isSelected ? 1 : 0.8,
             fillColor: color,
-            fillOpacity: isSelected ? 0.9 : 0.6,
+            fillOpacity: isSelected ? 0.95 : 0.72,
           };
         },
         onEachFeature: (feature, layer) => {
           const props = feature.properties || {};
-          const cid = props.cell_id || 'Parcel';
           const ndvi = props.ndvi !== undefined ? props.ndvi.toFixed(2) : '--';
           const ndwi = props.ndwi !== undefined ? props.ndwi.toFixed(2) : '--';
-          const stressClass = props.stress_class || 'MODERATE';
+          const detail = activeLayer === 'priority'
+            ? t[`priority${props.priority}`]
+            : `${t.popupStress}: ${t.stress[props.stress_class] ?? props.stress_class}`;
 
           layer.on({
             click: (e) => {
@@ -194,7 +217,7 @@ export default function MapContainer({
               }
             },
             mouseover: () => {
-              layer.setStyle({ weight: 2.5, opacity: 1, fillOpacity: 0.85 });
+              layer.setStyle({ weight: 2.5, opacity: 1, fillOpacity: 0.9 });
             },
             mouseout: () => {
               if (props.cell_id !== selectedParcelId) {
@@ -203,13 +226,12 @@ export default function MapContainer({
             },
           });
 
-          // Lightweight popup
           layer.bindPopup(`
-            <div style="font-family: sans-serif; font-size: 12px; line-height: 1.4;">
-              <strong style="color: #00f2fe; font-size: 13px;">${cid}</strong><br/>
-              <span>Stress: <strong>${stressClass}</strong></span><br/>
-              <span>NDVI: ${ndvi} | NDWI: ${ndwi}</span><br/>
-              <span style="color: #94a3b8; font-size: 11px;">Click for details</span>
+            <div class="map-popup">
+              <strong>${escapeHtml(props.cell_id ?? '')}</strong><br/>
+              <span>${escapeHtml(detail)}</span><br/>
+              <span>NDVI ${ndvi}, NDWI ${ndwi}</span><br/>
+              <span class="map-popup-hint">${escapeHtml(t.popupDetails)}</span>
             </div>
           `);
         },
@@ -219,7 +241,7 @@ export default function MapContainer({
     } catch (err) {
       console.warn('Failed to render data layer GeoJSON:', err);
     }
-  }, [stressMapGeoJson, irrigationMapGeoJson, activeLayer, selectedParcelId, onSelectParcel]);
+  }, [stressMapGeoJson, irrigationMapGeoJson, activeLayer, selectedParcelId, onSelectParcel, baseMap, t]);
 
   const fitCommandArea = () => {
     if (mapInstanceRef.current && boundaryLayerRef.current) {
@@ -229,32 +251,33 @@ export default function MapContainer({
 
   const focusHeadworks = () => {
     if (mapInstanceRef.current) {
-      mapInstanceRef.current.flyTo([18.1482, 74.0485], 13);
+      mapInstanceRef.current.flyTo(HEADWORKS, 13);
     }
   };
 
   return (
     <div className="map-panel" id="gis-map-panel">
-      {/* Map Toolbar */}
       <div className="map-toolbar">
-        <div className="map-layer-toggles">
+        <div className="map-layer-toggles" role="group" aria-label={t.layerGroup}>
           <button
             type="button"
             className={`layer-btn ${activeLayer === 'stress' ? 'active' : ''}`}
+            aria-pressed={activeLayer === 'stress'}
             onClick={() => onLayerChange('stress')}
             id="toggle-layer-stress"
           >
-            <Layers size={14} />
-            <span>Water Stress</span>
+            <Layers size={14} aria-hidden="true" />
+            <span>{t.layerStress}</span>
           </button>
           <button
             type="button"
             className={`layer-btn ${activeLayer === 'priority' ? 'active' : ''}`}
+            aria-pressed={activeLayer === 'priority'}
             onClick={() => onLayerChange('priority')}
             id="toggle-layer-priority"
           >
-            <Navigation size={14} />
-            <span>Irrigation Priority</span>
+            <Navigation size={14} aria-hidden="true" />
+            <span>{t.layerPriority}</span>
           </button>
         </div>
 
@@ -263,88 +286,43 @@ export default function MapContainer({
             type="button"
             className="layer-btn"
             onClick={() => setBaseMap(baseMap === 'street' ? 'satellite' : 'street')}
-            title="Toggle Base Tile"
+            title={t.baseMapHelp}
             id="toggle-basemap-btn"
           >
-            <Eye size={14} />
-            <span>{baseMap === 'street' ? 'Satellite' : 'Street Map'}</span>
+            <Eye size={14} aria-hidden="true" />
+            <span>{baseMap === 'street' ? t.showSatellite : t.showStreet}</span>
           </button>
-          <button
-            type="button"
-            className="icon-btn"
-            onClick={fitCommandArea}
-            title="Fit Command Area Boundary"
-            id="fit-boundary-btn"
-          >
-            <Maximize2 size={15} />
+          <button type="button" className="icon-btn" onClick={fitCommandArea} title={t.fitArea} aria-label={t.fitArea} id="fit-boundary-btn">
+            <Maximize2 size={15} aria-hidden="true" />
           </button>
-          <button
-            type="button"
-            className="icon-btn"
-            onClick={focusHeadworks}
-            title="Focus Veer Dam Headworks"
-            id="focus-headworks-btn"
-          >
-            <ZoomIn size={15} />
+          <button type="button" className="icon-btn" onClick={focusHeadworks} title={t.focusHeadworks} aria-label={t.focusHeadworks} id="focus-headworks-btn">
+            <ZoomIn size={15} aria-hidden="true" />
           </button>
         </div>
       </div>
 
-      {/* Leaflet Map Root */}
-      <div id="leaflet-map-root" ref={mapRef}></div>
+      <div className="map-stage">
+        <div id="leaflet-map-root" ref={mapRef} role="region" aria-label={t.mapRegion}></div>
+        {isLoading && (
+          <div className="map-loading skeleton" id="map-loading" role="status">
+            <span>{t.loadingMap}</span>
+          </div>
+        )}
+      </div>
 
-      {/* Floating Legend */}
       <div className="map-legend-floating" id="map-legend">
-        <div className="legend-title">
-          {activeLayer === 'stress' ? 'Crop Water Stress' : 'Irrigation Scheduling'}
-        </div>
+        <div className="legend-title">{activeLayer === 'stress' ? t.legendStress : t.legendPriority}</div>
         {activeLayer === 'stress' ? (
           <>
-            <div className="legend-row">
-              <div className="legend-chip">
-                <span className="chip-color green"></span>
-                <span>Low Stress</span>
-              </div>
-              <span style={{ color: 'var(--text-muted)' }}>{legendValue(stress?.low_stress_pct, stress?.low_stress_hectares)}</span>
-            </div>
-            <div className="legend-row">
-              <div className="legend-chip">
-                <span className="chip-color yellow"></span>
-                <span>Moderate Stress</span>
-              </div>
-              <span style={{ color: 'var(--text-muted)' }}>{legendValue(stress?.moderate_stress_pct, stress?.moderate_stress_hectares)}</span>
-            </div>
-            <div className="legend-row">
-              <div className="legend-chip">
-                <span className="chip-color red"></span>
-                <span>High Stress</span>
-              </div>
-              <span style={{ color: 'var(--text-muted)' }}>{legendValue(stress?.high_stress_pct, stress?.high_stress_hectares)}</span>
-            </div>
+            <LegendRow chip="green" label={t.lowStress} value={legendValue(stress?.low_stress_pct, stress?.low_stress_hectares)} />
+            <LegendRow chip="yellow" label={t.moderateStress} value={legendValue(stress?.moderate_stress_pct, stress?.moderate_stress_hectares)} />
+            <LegendRow chip="red" label={t.highStress} value={legendValue(stress?.high_stress_pct, stress?.high_stress_hectares)} />
           </>
         ) : (
           <>
-            <div className="legend-row">
-              <div className="legend-chip">
-                <span className="chip-color red"></span>
-                <span>Priority 1 (Urgent 24-48h)</span>
-              </div>
-              <span style={{ color: 'var(--text-muted)' }}>Canal Priority</span>
-            </div>
-            <div className="legend-row">
-              <div className="legend-chip">
-                <span className="chip-color yellow"></span>
-                <span>Priority 2 (Next 3-5 Days)</span>
-              </div>
-              <span style={{ color: 'var(--text-muted)' }}>Roster Turn</span>
-            </div>
-            <div className="legend-row">
-              <div className="legend-chip">
-                <span className="chip-color blue"></span>
-                <span>Priority 3 (Adequate)</span>
-              </div>
-              <span style={{ color: 'var(--text-muted)' }}>Routine</span>
-            </div>
+            <LegendRow chip="red" label={t.priority1} value={legendValue(priority?.priority_1_pct, priority?.priority_1_urgent_ha)} />
+            <LegendRow chip="yellow" label={t.priority2} value={legendValue(priority?.priority_2_pct, priority?.priority_2_scheduled_ha)} />
+            <LegendRow chip="blue" label={t.priority3} value={legendValue(priority?.priority_3_pct, priority?.priority_3_normal_ha)} />
           </>
         )}
       </div>

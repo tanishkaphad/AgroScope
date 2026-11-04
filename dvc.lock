@@ -275,22 +275,18 @@ stages:
       hash: md5
       md5: 58ab0c08f541aad5f766d24cbcb07d87
       size: 16632
-      isexec: true
     - path: src/config.py
       hash: md5
       md5: f3ca1a5c428b072b7c9a5849020bbddc
       size: 545
-      isexec: true
     - path: src/inference/explainability.py
       hash: md5
       md5: 6d6bf08c2cc46ec146574e0966fe7a5a
       size: 10727
-      isexec: true
     - path: src/inference/predict.py
       hash: md5
-      md5: 9e750b6c34ac838e2f3b9b42932a2bf1
-      size: 20737
-      isexec: true
+      md5: 5b1470a49f64c5d6dd9d2b4feaecc2b5
+      size: 22373
     params:
       configs/settings.yaml:
         aoi.cell_area_ha: 6.25
@@ -300,8 +296,8 @@ stages:
     outs:
     - path: data/processed/cycle_statistics.json
       hash: md5
-      md5: 8d1e67a0686da31dbdb22029573e97ca
-      size: 714
+      md5: fd1b763df54c86f9ce686068a72d25c8
+      size: 740
     - path: data/processed/irrigation_map.geojson
       hash: md5
       md5: 6455e22bbc62e02697efa7c2cc4748e0
@@ -371,20 +367,26 @@ stages:
       hash: md5
       md5: b2e725936718281842d77ff70be25fea
       size: 167818738
+    - path: data/processed/cycle_results.csv
+      hash: md5
+      md5: f1309b5a19beeccd1b2a7bfcf4394a39
+      size: 36065423
     - path: data/processed/cycle_statistics.json
       hash: md5
-      md5: 8d1e67a0686da31dbdb22029573e97ca
-      size: 714
+      md5: fd1b763df54c86f9ce686068a72d25c8
+      size: 740
+    - path: data/processed/cycle_statistics_by_date.json
+      hash: md5
+      md5: 68ccd4a89f592fa2193241a8e46e9cac
+      size: 22094
     - path: src/config.py
       hash: md5
       md5: f3ca1a5c428b072b7c9a5849020bbddc
       size: 545
-      isexec: true
     - path: src/monitoring/drift.py
       hash: md5
       md5: 481f331ad66fea7661a5556f13deb150
       size: 4941
-      isexec: true
     params:
       configs/settings.yaml:
         monitoring:
@@ -420,12 +422,12 @@ stages:
     outs:
     - path: data/processed/drift_report.html
       hash: md5
-      md5: 451c66e88f0048e5a20565613ac792ee
-      size: 5284906
+      md5: 7b509c53a321ffea71d754d84fc75693
+      size: 5285766
     - path: data/processed/drift_summary.json
       hash: md5
-      md5: 7d36e7b7e8efb0543db970eede34ed83
-      size: 4412
+      md5: 6a05f184b78c1cc25544e8afdb9cac3d
+      size: 4600
   validate_raw:
     cmd: python src/validation/validate_data.py --stage raw
     deps:

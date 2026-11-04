@@ -59,6 +59,10 @@ def test_batch_prediction_writes_matching_maps_and_statistics(predictor, tmp_pat
     stats = json.loads((tmp_path / "cycle_statistics.json").read_text(encoding="utf-8"))
 
     assert len(stress) == len(irrigation) == 30
+    assert stats["cycle_date"] == "2024-01-01"
+    by_date = json.loads((tmp_path / "cycle_statistics_by_date.json").read_text(encoding="utf-8"))
+    assert set(by_date) == {"2023-12-01", "2024-01-01"}
+    assert by_date["2024-01-01"] == stats
     assert {f["properties"]["cell_id"] for f in stress} == {f["properties"]["cell_id"] for f in irrigation}
     assert stats["total_cultivated_hectares"] == 30 * settings["aoi"]["cell_area_ha"]
     breakdown = stats["stress_breakdown"]

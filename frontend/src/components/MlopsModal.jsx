@@ -1,141 +1,206 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Activity, AlertTriangle, CheckCircle, ExternalLink, X } from 'lucide-react';
-import { driftReportUrl, fetchDriftReport, fetchMetrics, fetchPromotionDecision } from '../services/api';
+import { errorText, formatDate } from '../i18n';
+import { driftReportUrl, fetchDriftReport, fetchMetrics, fetchPromotionDecision, TOOL_LINKS } from '../services/api';
 
-const sectionHeading = { fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.6rem' };
-const panel = { background: 'rgba(255, 255, 255, 0.03)', border: '1px solid var(--border-subtle)', borderRadius: '10px', padding: '0.75rem', marginBottom: '1.25rem' };
-const row = { display: 'flex', justifyContent: 'space-between', gap: '1rem', padding: '0.35rem 0', fontSize: '0.8rem' };
+const TOP_DRIFT_INPUTS = 5;
 
-export default function MlopsModal({ isOpen, onClose }) {
-  const [metrics, setMetrics] = useState(null);
-  const [drift, setDrift] = useState(null);
-  const [promotion, setPromotion] = useState(null);
+function Row({ label, children }) {
+  return (
+    <div className="status-row">
+      <span>{label}</span>
+      <span className="status-value">{children}</span>
+    </div>
+  );
+}
+
+function PanelSkeleton({ rows }) {
+  return (
+    <div className="status-panel" aria-hidden="true">
+      {Array.from({ length: rows }, (_, index) => (
+        <div className="status-row" key={index}>
+          <span className="skeleton skeleton-text" style={{ width: '45%' }} />
+          <span className="skeleton skeleton-text" style={{ width: '20%' }} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export default function MlopsModal({ t, currentLang, onClose }) {
+  const [results, setResults] = useState({});
   const [errors, setErrors] = useState([]);
+  const [attempt, setAttempt] = useState(0);
+  const closeButtonRef = useRef(null);
+  const dialogRef = useRef(null);
 
   useEffect(() => {
-    if (!isOpen) return;
-
     let isMounted = true;
-    const addError = (err) => {
-      if (isMounted) setErrors((current) => (current.includes(err.message) ? current : [...current, err.message]));
+    const load = (key, promise) => {
+      promise
+        .then((value) => isMounted && setResults((current) => ({ ...current, [key]: value })))
+        .catch((err) => {
+          if (!isMounted) return;
+          setResults((current) => ({ ...current, [key]: null }));
+          setErrors((current) => (current.includes(err.message) ? current : [...current, err.message]));
+        });
     };
-
-    setErrors([]);
-    fetchMetrics().then((res) => isMounted && setMetrics(res)).catch(addError);
-    fetchDriftReport().then((res) => isMounted && setDrift(res)).catch(addError);
-    fetchPromotionDecision().then((res) => isMounted && setPromotion(res)).catch(addError);
-
+    load('metrics', fetchMetrics());
+    load('drift', fetchDriftReport());
+    load('promotion', fetchPromotionDecision());
     return () => {
       isMounted = false;
     };
-  }, [isOpen]);
+  }, [attempt]);
 
-  if (!isOpen) return null;
+  // Keep keyboard focus inside the dialog, and return it to the opening button afterwards.
+  useEffect(() => {
+    const previouslyFocused = document.activeElement;
+    closeButtonRef.current?.focus();
 
-  const driftedFeatures = drift?.features?.filter((feature) => feature.drift) ?? [];
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        onClose();
+      } else if (event.key === 'Tab') {
+        const focusable = dialogRef.current.querySelectorAll('a[href], button:not([disabled])');
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first.focus();
+        }
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      previouslyFocused?.focus?.();
+    };
+  }, [onClose]);
+
+  const handleRetry = () => {
+    setErrors([]);
+    setResults({});
+    setAttempt((current) => current + 1);
+  };
+
+  const { metrics, drift, promotion } = results;
+  const score = (value) => value?.toFixed(4) ?? t.notAvailable;
+
+  const driftedInputs = (drift?.features ?? []).filter((feature) => feature.drift).sort((a, b) => b.score - a.score);
+  const topInputs = driftedInputs.slice(0, TOP_DRIFT_INPUTS);
+  const largestScore = topInputs[0]?.score || 1;
 
   return (
     <div className="modal-overlay" id="mlops-modal-backdrop" onClick={onClose}>
-      <div className="modal-dialog" onClick={(e) => e.stopPropagation()}>
+      <div
+        className="modal-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="mlops-modal-title"
+        ref={dialogRef}
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="modal-header">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-            <Activity size={18} color="var(--brand-cyan)" />
-            <h3 style={{ fontFamily: 'var(--font-heading)', color: '#fff', fontSize: '1.15rem' }}>
-              Model Status
-            </h3>
+          <div className="modal-title">
+            <Activity size={18} aria-hidden="true" />
+            <h2 id="mlops-modal-title">{t.modelStatus}</h2>
           </div>
-          <button type="button" className="icon-btn" onClick={onClose} id="modal-close-btn">
-            <X size={16} />
+          <button type="button" className="icon-btn" onClick={onClose} id="modal-close-btn" ref={closeButtonRef} aria-label={t.close} title={`${t.close} (Esc)`}>
+            <X size={16} aria-hidden="true" />
           </button>
         </div>
 
         <div className="modal-body">
-          {errors.map((message) => (
-            <div key={message} className="data-error-banner" role="alert" style={{ margin: '0 0 0.75rem' }}>
-              <AlertTriangle size={16} />
-              <span>{message}</span>
+          {errors.length > 0 && (
+            <div className="data-error-banner modal-error" role="alert">
+              <AlertTriangle size={16} aria-hidden="true" />
+              <span>{errors.map((message) => errorText(message, t)).join(' ')}</span>
+              <button type="button" className="layer-btn banner-retry" onClick={handleRetry} id="modal-retry-btn">
+                {t.retry}
+              </button>
             </div>
-          ))}
-
-          {metrics && (
-            <>
-              <h4 style={sectionHeading}>Current Model</h4>
-              <div style={panel}>
-                <div style={row}>
-                  <span>Version</span>
-                  <strong style={{ color: 'var(--brand-cyan)' }}>{metrics.active_model ?? 'Not available'}</strong>
-                </div>
-                <div style={row}>
-                  <span>Macro F1, unseen cells</span>
-                  <span>{metrics.macro_f1_score?.toFixed(4) ?? 'Not available'}</span>
-                </div>
-                <div style={row}>
-                  <span>Macro F1, later dates</span>
-                  <span>{metrics.temporal_macro_f1?.toFixed(4) ?? 'Not available'}</span>
-                </div>
-                <div style={row}>
-                  <span>Later dates, without label inputs</span>
-                  <span>{metrics.temporal_macro_f1_without_label_inputs?.toFixed(4) ?? 'Not available'}</span>
-                </div>
-                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.4rem' }}>
-                  {metrics.score_note}
-                </div>
-              </div>
-            </>
           )}
 
-          {promotion && (
-            <>
-              <h4 style={sectionHeading}>Latest Promotion Decision</h4>
-              <div style={panel}>
-                <div style={row}>
-                  <span>Result</span>
-                  <strong style={{ color: promotion.promoted ? '#34d399' : '#fca5a5' }}>
-                    {promotion.promoted ? 'Promoted' : 'Rejected'}
-                  </strong>
-                </div>
-                <div style={row}>
-                  <span>Active version</span>
-                  <span>{promotion.active_version}</span>
-                </div>
-                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.4rem' }}>{promotion.reason}</div>
-              </div>
-            </>
+          <h3 className="status-heading">{t.currentModel}</h3>
+          {metrics === undefined ? <PanelSkeleton rows={4} /> : metrics && (
+            <div className="status-panel fade-in">
+              <Row label={t.version}><strong className="status-accent">{metrics.active_model ?? t.notAvailable}</strong></Row>
+              <Row label={t.f1Unseen}>{score(metrics.macro_f1_score)}</Row>
+              <Row label={t.f1Later}>{score(metrics.temporal_macro_f1)}</Row>
+              <Row label={t.f1NoLabels}>{score(metrics.temporal_macro_f1_without_label_inputs)}</Row>
+              <p className="status-note">{t.scoreNote}</p>
+            </div>
           )}
 
-          {drift && (
-            <>
-              <h4 style={sectionHeading}>Data Drift (Evidently)</h4>
-              <div style={panel}>
-                <div style={{ ...row, alignItems: 'center' }}>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                    {drift.drift_detected ? <AlertTriangle size={15} color="#fca5a5" /> : <CheckCircle size={15} color="#34d399" />}
-                    {drift.drift_detected ? 'Drift detected' : 'No drift detected'}
-                  </span>
-                  <strong>{Math.round(drift.drifted_share * 100)}% of inputs</strong>
-                </div>
-                <div style={row}>
-                  <span>Compared</span>
-                  <span>{drift.current_date} with data {drift.reference_period}</span>
-                </div>
-                {driftedFeatures.length > 0 && (
-                  <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: '0.3rem' }}>
-                    Drifted: {driftedFeatures.map((feature) => feature.feature).join(', ')}
-                  </div>
-                )}
-                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.4rem' }}>{drift.note}</div>
-                <a
-                  href={driftReportUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  id="drift-report-link"
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.78rem', color: 'var(--brand-cyan)', marginTop: '0.6rem' }}
-                >
-                  Open full report <ExternalLink size={12} />
+          <h3 className="status-heading">{t.promotion}</h3>
+          {promotion === undefined ? <PanelSkeleton rows={3} /> : promotion && (
+            <div className="status-panel fade-in">
+              <Row label={t.result}>
+                <strong className={promotion.promoted ? 'status-good' : 'status-bad'}>
+                  {promotion.promoted ? t.promoted : t.rejected}
+                </strong>
+              </Row>
+              <Row label={t.candidateModel}>{promotion.candidate_model}</Row>
+              <Row label={t.candidateScore}>{promotion.candidate_score}</Row>
+              <Row label={t.minimumScore}>{promotion.min_score}</Row>
+              <Row label={t.activeVersion}>{promotion.active_version}</Row>
+            </div>
+          )}
+
+          <h3 className="status-heading">{t.driftTitle}</h3>
+          {drift === undefined ? <PanelSkeleton rows={3} /> : drift && (
+            <div className="status-panel fade-in">
+              <Row label={
+                <span className="status-with-icon">
+                  {drift.drift_detected ? <AlertTriangle size={15} className="status-bad" aria-hidden="true" /> : <CheckCircle size={15} className="status-good" aria-hidden="true" />}
+                  {drift.drift_detected ? t.driftDetected : t.driftNone}
+                </span>
+              }>
+                <strong>{t.driftShare(Math.round(drift.drifted_share * 100))}</strong>
+              </Row>
+              <Row label={t.compared}>{t.comparedValue(formatDate(drift.current_date, currentLang))}</Row>
+
+              {topInputs.length > 0 && (
+                <>
+                  <h4 className="status-subheading">{t.mostChanged}</h4>
+                  <ul className="drift-list" id="drift-top-inputs">
+                    {topInputs.map((input) => (
+                      <li key={input.feature} className="drift-item" title={`${input.test}: ${input.score}`}>
+                        <span>{t.features[input.feature] ?? input.feature}</span>
+                        <span className="driver-bar-bg drift-bar" aria-hidden="true">
+                          <span className="driver-bar-fill red" style={{ width: `${(input.score / largestScore) * 100}%`, display: 'block' }} />
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                  {driftedInputs.length > topInputs.length && (
+                    <p className="status-note">{t.andMore(driftedInputs.length - topInputs.length)}</p>
+                  )}
+                </>
+              )}
+
+              <p className="status-note">{t.driftNote}</p>
+              <a href={driftReportUrl} target="_blank" rel="noreferrer" id="drift-report-link" className="status-link">
+                {t.openReport} <ExternalLink size={12} aria-hidden="true" />
+              </a>
+            </div>
+          )}
+
+          <h3 className="status-heading">{t.tools}</h3>
+          <div className="status-panel">
+            <div className="tool-links" id="tool-links">
+              {TOOL_LINKS.map(({ label, url }) => (
+                <a key={label} href={url} target="_blank" rel="noreferrer" className="layer-btn">
+                  {label} <ExternalLink size={12} aria-hidden="true" />
                 </a>
-              </div>
-            </>
-          )}
+              ))}
+            </div>
+            <p className="status-note">{t.toolsNote}</p>
+          </div>
         </div>
       </div>
     </div>

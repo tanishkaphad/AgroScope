@@ -157,6 +157,8 @@ stages:
       - src/monitoring/drift.py
       - data/features/features.csv
       - data/processed/cycle_statistics.json
+      - data/processed/cycle_statistics_by_date.json
+      - data/processed/cycle_results.csv
     outs:
       - data/processed/drift_summary.json
       - data/processed/drift_report.html

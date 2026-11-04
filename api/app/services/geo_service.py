@@ -14,7 +14,11 @@ import logging
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+import pandas as pd
+
 from api.app.config import settings
+from src.advisory.advisory_engine import IrrigationAdvisoryEngine
+from src.inference.predict import CLASS_LABELS, irrigation_properties, stress_properties
 
 logger = logging.getLogger("agroscope.geo_service")
 
@@ -30,7 +34,11 @@ class GeoService:
         self.cell_lookup: Dict[str, Dict[str, Any]] = {}
         self.irrigation_lookup: Dict[str, Dict[str, Any]] = {}
         self.available_dates: List[str] = []
+        self.results_by_date: Dict[str, pd.DataFrame] = {}
+        self.statistics_by_date: Dict[str, Dict[str, Any]] = {}
+        self.grid_geometry: Dict[str, Dict[str, Any]] = {}
         self._load_data()
+        self._load_other_dates()
 
     @classmethod
     def get_instance(cls) -> GeoService:
@@ -92,6 +100,73 @@ class GeoService:
             except Exception as exc:
                 logger.error("Failed to load irrigation map GeoJSON: %s", exc)
 
+    def _load_other_dates(self) -> None:
+        """Load results for every date. Without these files, only the published date is available."""
+        paths = (settings.CYCLE_RESULTS_CSV, settings.CYCLE_STATS_BY_DATE_JSON, settings.GRID_GEOJSON)
+        if not all(path.exists() for path in paths):
+            logger.warning("Results for other dates are missing, so only the published date is available.")
+            return
+        try:
+            results = pd.read_csv(settings.CYCLE_RESULTS_CSV)
+            self.results_by_date = {date: group for date, group in results.groupby("date")}
+            with open(settings.CYCLE_STATS_BY_DATE_JSON, "r", encoding="utf-8") as f:
+                self.statistics_by_date = json.load(f)
+            with open(settings.GRID_GEOJSON, "r", encoding="utf-8") as f:
+                self.grid_geometry = {feat["properties"]["cell_id"]: feat["geometry"] for feat in json.load(f)["features"]}
+            self.available_dates = sorted(set(self.available_dates) | set(self.results_by_date))
+            logger.info("Loaded results for %d dates.", len(self.results_by_date))
+        except Exception as exc:
+            logger.error("Failed to load results for other dates: %s", exc)
+
+    def has_date(self, date: str) -> bool:
+        return date in self.available_dates
+
+    def _is_other_date(self, date: Optional[str]) -> bool:
+        """The published date is served from its full map files, and any other from the results table."""
+        return date is not None and date != (self.cycle_stats or {}).get("cycle_date") and date in self.results_by_date
+
+    @staticmethod
+    def _stress_feature_properties(row: Any) -> Dict[str, Any]:
+        return stress_properties(row.cell_id, row.date, CLASS_LABELS[row.stress_code], row.confidence, row.ndvi_mean, row.ndwi_mean)
+
+    @staticmethod
+    def _irrigation_feature_properties(row: Any) -> Dict[str, Any]:
+        advisory = IrrigationAdvisoryEngine.evaluate_cell(
+            stress_class=row.stress_code,
+            confidence=row.confidence,
+            ndwi_mean=row.ndwi_mean,
+            temp_max_c=row.temp_max_c,
+            et0_8day_sum=row.et0_8day_sum,
+            rainfall_8day=row.rainfall_8day,
+        )
+        return irrigation_properties(row.cell_id, row.date, advisory, row.confidence, row.ndvi_mean, row.ndwi_mean)
+
+    def _map_for_date(self, date: str, build_properties: Any, sample: bool, limit: int) -> Dict[str, Any]:
+        """Build one date's map on request. Sampling matches the published map's, so it covers the area evenly."""
+        rows = self.results_by_date[date]
+        total = len(rows)
+        if sample and limit > 0 and total > limit:
+            rows = rows.iloc[:: max(1, total // limit)].iloc[:limit]
+
+        features = [
+            {"type": "Feature", "geometry": self.grid_geometry[row.cell_id], "properties": build_properties(row)}
+            for row in rows.itertuples(index=False)
+            if row.cell_id in self.grid_geometry
+        ]
+        return {
+            "type": "FeatureCollection",
+            "metadata": {"total_cells": total, "sampled_cells": len(features), "is_sampled": len(features) < total},
+            "features": features,
+        }
+
+    def _cell_for_date(self, cell_id: str, date: str, build_properties: Any) -> Optional[Dict[str, Any]]:
+        rows = self.results_by_date[date]
+        match = rows[rows["cell_id"] == cell_id]
+        if match.empty or cell_id not in self.grid_geometry:
+            return None
+        row = next(match.itertuples(index=False))
+        return {"type": "Feature", "geometry": self.grid_geometry[cell_id], "properties": build_properties(row)}
+
     def reload(self) -> None:
         """Replace cached results with the latest files."""
         self.__init__()
@@ -102,12 +177,14 @@ class GeoService:
     def get_available_dates(self) -> List[str]:
         return self.available_dates
 
-    def get_stress_map(self, sample: bool = True, limit: int = 1500) -> Optional[Dict[str, Any]]:
+    def get_stress_map(self, sample: bool = True, limit: int = 1500, date: Optional[str] = None) -> Optional[Dict[str, Any]]:
         """Return stress map GeoJSON.
         
         If sample=True, takes an evenly spaced sub-sample of cells to guarantee
         fast, 60fps Leaflet rendering without dropping overall spatial distribution.
         """
+        if self._is_other_date(date):
+            return self._map_for_date(date, self._stress_feature_properties, sample, limit)
         if not self.stress_map:
             return None
 
@@ -129,8 +206,10 @@ class GeoService:
             "features": sampled_features,
         }
 
-    def get_irrigation_map(self, sample: bool = True, limit: int = 1500) -> Optional[Dict[str, Any]]:
+    def get_irrigation_map(self, sample: bool = True, limit: int = 1500, date: Optional[str] = None) -> Optional[Dict[str, Any]]:
         """Return irrigation map GeoJSON with priority zones."""
+        if self._is_other_date(date):
+            return self._map_for_date(date, self._irrigation_feature_properties, sample, limit)
         if not self.irrigation_map:
             return None
 
@@ -151,13 +230,19 @@ class GeoService:
             "features": sampled_features,
         }
 
-    def get_statistics(self) -> Optional[Dict[str, Any]]:
+    def get_statistics(self, date: Optional[str] = None) -> Optional[Dict[str, Any]]:
+        if self._is_other_date(date):
+            return self.statistics_by_date.get(date)
         return self.cycle_stats
 
-    def get_cell_detail(self, cell_id: str) -> Optional[Dict[str, Any]]:
+    def get_cell_detail(self, cell_id: str, date: Optional[str] = None) -> Optional[Dict[str, Any]]:
+        if self._is_other_date(date):
+            return self._cell_for_date(cell_id, date, self._stress_feature_properties)
         return self.cell_lookup.get(cell_id)
 
-    def get_irrigation_detail(self, cell_id: str) -> Optional[Dict[str, Any]]:
+    def get_irrigation_detail(self, cell_id: str, date: Optional[str] = None) -> Optional[Dict[str, Any]]:
+        if self._is_other_date(date):
+            return self._cell_for_date(cell_id, date, self._irrigation_feature_properties)
         return self.irrigation_lookup.get(cell_id)
 
     def has_results(self) -> bool:

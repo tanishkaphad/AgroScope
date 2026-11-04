@@ -2,7 +2,7 @@
 
 How we'll meet the MLOps course rubric in the 2 days left from 2026-11-04. The long-term product roadmap is in [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md), and pauses until this is done.
 
-**Status:** sections 1-6 done, except that CI still needs checking on GitHub. Sections 7-8 to do.
+**Status:** sections 1-7 done. Section 8 to do.
 
 **Rules:** Claude runs no git commands, and every service stays free.
 
@@ -110,17 +110,17 @@ How we'll meet the MLOps course rubric in the 2 days left from 2026-11-04. The l
 
 **Goal:** a clear, polished dashboard that holds up in the five-minute demo. This improves what's already there, and doesn't add the paused farmer features.
 
-- [ ] Add your Carto key, or confirm the OpenStreetMap fallback looks good, and adjust map colours so results stay readable on the light base map.
-- [ ] Show the data date prominently, and make clear that it's a past date.
-- [ ] Show how many cells the map displays, such as 1,500 of 19,300.
-- [ ] Add clear loading states for the first page load and for each panel.
-- [ ] Tidy spacing and hierarchy in the KPI bar, sidebar and Model Status window.
-- [ ] Show drift as a short list of the most changed inputs, not all 25 names.
-- [ ] Add links from Model Status to MLflow, Grafana and the API docs.
-- [ ] Translate Model Status and other English-only labels into Marathi and Hindi.
-- [ ] Make the layout work at phone and tablet widths.
-- [ ] Improve keyboard use, contrast and labels.
-- [ ] Fix the `oxlint` warnings in the files changed.
+- [x] Add your Carto key, or confirm the OpenStreetMap fallback looks good, and adjust map colours so results stay readable on the light base map.
+- [x] Show the data date prominently, and make clear that it's a past date.
+- [x] Show how many cells the map displays, such as 1,500 of 19,300.
+- [x] Add clear loading states for the first page load and for each panel.
+- [x] Tidy spacing and hierarchy in the KPI bar, sidebar and Model Status window.
+- [x] Show drift as a short list of the most changed inputs, not all 25 names.
+- [x] Add links from Model Status to MLflow, Grafana and the API docs.
+- [x] Translate Model Status and other English-only labels into Marathi and Hindi.
+- [x] Make the layout work at phone and tablet widths.
+- [x] Improve keyboard use, contrast and labels.
+- [x] Fix the `oxlint` warnings in the files changed.
 
 **Files:** `frontend/src/App.jsx`, `frontend/src/components/`, `frontend/src/index.css`.
 

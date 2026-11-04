@@ -92,11 +92,63 @@ def test_study_area_geojson():
 
 
 @needs_results
-def test_available_dates_match_published_results():
+def test_available_dates_include_the_published_date():
     response = client.get("/available-dates")
     assert response.status_code == 200
-    published = {feat["properties"]["date"] for feat in geo_service.stress_map["features"]}
-    assert set(response.json()) == published
+    assert geo_service.cycle_stats["cycle_date"] in response.json()
+
+
+@needs_results
+def test_published_date_matches_requesting_no_date():
+    published = geo_service.cycle_stats["cycle_date"]
+    assert client.get(f"/statistics?date={published}").json() == client.get("/statistics").json()
+    assert client.get(f"/stress-map?date={published}&limit=20").json() == client.get("/stress-map?limit=20").json()
+
+
+def _other_date():
+    published = geo_service.cycle_stats["cycle_date"]
+    return next(date for date in geo_service.available_dates if date != published)
+
+
+@needs_results
+def test_another_date_returns_its_own_map_statistics_and_cell():
+    date = _other_date()
+    stats = client.get(f"/statistics?date={date}").json()
+    assert stats["cycle_date"] == date
+
+    stress = client.get(f"/stress-map?date={date}&limit=50").json()
+    assert len(stress["features"]) <= 50
+    assert stress["metadata"]["total_cells"] == stats["active_cultivated_cells"]
+    assert {f["properties"]["date"] for f in stress["features"]} == {date}
+
+    irrigation = client.get(f"/irrigation-map?date={date}&limit=50").json()
+    assert {f["properties"]["date"] for f in irrigation["features"]} == {date}
+
+    props = stress["features"][0]["properties"]
+    detail = client.get(f"/area/{props['cell_id']}?date={date}&lang=hi").json()
+    assert detail["date"] == date
+    assert detail["water_stress"]["class"] == props["stress_class"]
+    assert detail["irrigation_advisory"]["title"] == detail["irrigation_advisory"]["translations"]["title"]["hi"]
+
+
+@needs_results
+def test_results_table_agrees_with_the_published_map():
+    published = geo_service.cycle_stats["cycle_date"]
+    rows = geo_service.results_by_date[published].set_index("cell_id")
+    assert len(rows) == len(geo_service.stress_map["features"])
+    for feat in random.Random(1).sample(geo_service.stress_map["features"], 100):
+        props = feat["properties"]
+        row = rows.loc[props["cell_id"]]
+        assert ["LOW", "MODERATE", "HIGH"][row["stress_code"]] == props["stress_class"]
+        assert row["confidence"] == props["confidence"]
+        assert int(row["priority"]) == geo_service.irrigation_lookup[props["cell_id"]]["properties"]["priority"]
+    assert geo_service.statistics_by_date[published] == geo_service.cycle_stats
+
+
+@needs_results
+def test_every_date_route_rejects_an_unknown_date():
+    for path in ("/statistics", "/stress-map", "/irrigation-map", "/area/ANY"):
+        assert client.get(f"{path}?date=1999-01-01").status_code == 404
 
 
 def test_available_dates_empty_without_results(no_results):

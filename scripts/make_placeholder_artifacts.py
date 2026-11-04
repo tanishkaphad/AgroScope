@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import json
 import pickle
+import shutil
 import sys
 from pathlib import Path
 
@@ -26,7 +27,7 @@ from src.inference.predict import AgroScopePredictor
 FEATURES = settings["training"]["features"]
 CLASS_LABELS = ["LOW", "MODERATE", "HIGH"]
 PLACEHOLDER_NOTE = "Synthetic placeholder for CI. Not a real result."
-CYCLE_DATE = "2024-01-01"
+CYCLE_DATES = ("2023-12-01", "2024-01-01")
 
 
 def make_feature_rows(rows: int, seed: int = 0) -> pd.DataFrame:
@@ -62,12 +63,16 @@ def build_tiny_model(model_dir: Path, rows: int = 300) -> None:
 def write_tiny_cycle_inputs(work_dir: Path, cells: int = 120) -> tuple[Path, Path]:
     """Write one date of features and a matching grid, in the formats prediction reads."""
     work_dir.mkdir(parents=True, exist_ok=True)
-    frame = make_feature_rows(cells, seed=1).drop(columns="target_stress_class")
-    frame["cell_id"] = [f"PLACEHOLDER_CELL_{i:04d}" for i in range(cells)]
-    frame["date"] = CYCLE_DATE
-    frame["is_vegetated"] = True
+    cell_ids = [f"PLACEHOLDER_CELL_{i:04d}" for i in range(cells)]
+    frames = []
+    for seed, date in enumerate(CYCLE_DATES, start=1):
+        frame = make_feature_rows(cells, seed=seed).drop(columns="target_stress_class")
+        frame["cell_id"] = cell_ids
+        frame["date"] = date
+        frame["is_vegetated"] = True
+        frames.append(frame)
     features_csv = work_dir / "features.csv"
-    frame.to_csv(features_csv, index=False)
+    pd.concat(frames).to_csv(features_csv, index=False)
 
     grid = {
         "type": "FeatureCollection",
@@ -80,7 +85,7 @@ def write_tiny_cycle_inputs(work_dir: Path, cells: int = 120) -> tuple[Path, Pat
                     "coordinates": [[[74 + i * 0.01, 18.0], [74.01 + i * 0.01, 18.0], [74.01 + i * 0.01, 18.01], [74 + i * 0.01, 18.01], [74 + i * 0.01, 18.0]]],
                 },
             }
-            for i, cell_id in enumerate(frame["cell_id"])
+            for i, cell_id in enumerate(cell_ids)
         ],
     }
     grid_geojson = work_dir / "grid.geojson"
@@ -107,6 +112,7 @@ def make_placeholders(root: Path) -> None:
     features_csv, grid_geojson = write_tiny_cycle_inputs(root / "data" / "placeholder_inputs")
     predictor = AgroScopePredictor(model_dir / "model.pkl", model_dir / "feature_metadata.json")
     predictor.run_cycle_inference(features_csv=features_csv, grid_geojson=grid_geojson, output_dir=processed)
+    shutil.copy2(grid_geojson, processed / "spatial_grid_250m.geojson")
 
     note = json.dumps({"placeholder": PLACEHOLDER_NOTE}, indent=2)
     _write_if_absent(processed / "drift_summary.json", note)

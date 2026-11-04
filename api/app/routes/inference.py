@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 from fastapi import APIRouter, HTTPException, Query
 from api.app.schemas.schemas import (
     AreaDetailResponse,
@@ -22,6 +22,7 @@ router = APIRouter(tags=["AI Inference & Explainability"])
 async def get_parcel_detail(
     cell_id: str,
     lang: str = Query("en", description="Preferred advisory language: 'en', 'mr', 'hi'"),
+    date: Optional[str] = Query(None, description="Cycle date, or the published date if left out"),
 ):
     """Retrieve the stored stress prediction and irrigation advisory for a specific parcel."""
     metrics_service.increment_request()
@@ -29,10 +30,13 @@ async def get_parcel_detail(
     if not geo_service.has_results():
         raise HTTPException(status_code=503, detail="Prediction results are not available.")
 
-    stress_feat = geo_service.get_cell_detail(cell_id)
-    irrigation_feat = geo_service.get_irrigation_detail(cell_id)
+    if date and not geo_service.has_date(date):
+        raise HTTPException(status_code=404, detail=f"No results available for {date}.")
+
+    stress_feat = geo_service.get_cell_detail(cell_id, date)
+    irrigation_feat = geo_service.get_irrigation_detail(cell_id, date)
     if not stress_feat or not irrigation_feat:
-        raise HTTPException(status_code=404, detail=f"No prediction available for cell {cell_id}.")
+        raise HTTPException(status_code=404, detail=f"No prediction available for cell {cell_id}{f' on {date}' if date else ''}.")
 
     stress = stress_feat["properties"]
     irrigation = irrigation_feat["properties"]

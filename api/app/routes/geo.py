@@ -36,9 +36,9 @@ async def get_water_stress_map(
 ):
     """Retrieve GeoJSON FeatureCollection of water stress predictions."""
     metrics_service.increment_request()
-    if date and date not in geo_service.get_available_dates():
+    if date and not geo_service.has_date(date):
         raise HTTPException(status_code=404, detail=f"No stress map available for {date}.")
-    data = geo_service.get_stress_map(sample=sample, limit=limit)
+    data = geo_service.get_stress_map(sample=sample, limit=limit, date=date)
     if data is None:
         raise HTTPException(status_code=503, detail="Stress map results are not available.")
     return JSONResponse(content=data)
@@ -46,12 +46,15 @@ async def get_water_stress_map(
 
 @router.get("/irrigation-map")
 async def get_irrigation_priority_map(
+    date: Optional[str] = Query(None, description="Cycle date (e.g. '2023-12-10')"),
     sample: bool = Query(True, description="Enable systematic spatial sampling for fast browser rendering"),
     limit: int = Query(1500, ge=0, le=25000, description="Max cells to return (0 for all cells)"),
 ):
     """Retrieve GeoJSON FeatureCollection of irrigation priority zones (P1, P2, P3)."""
     metrics_service.increment_request()
-    data = geo_service.get_irrigation_map(sample=sample, limit=limit)
+    if date and not geo_service.has_date(date):
+        raise HTTPException(status_code=404, detail=f"No irrigation map available for {date}.")
+    data = geo_service.get_irrigation_map(sample=sample, limit=limit, date=date)
     if data is None:
         raise HTTPException(status_code=503, detail="Irrigation map results are not available.")
     return JSONResponse(content=data)

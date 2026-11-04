@@ -42,6 +42,87 @@ logger = logging.getLogger("agroscope.inference")
 CELL_AREA_HECTARES = settings["aoi"]["cell_area_ha"]
 MIN_LATEST_COVERAGE = settings["inference"]["min_latest_coverage"]  # "latest" skips dates where a partial scene covers less of the grid
 
+CLASS_LABELS = ["LOW", "MODERATE", "HIGH"]
+STRESS_COLORS = {
+    "LOW": "#28a745",
+    "MODERATE": "#ffc107",
+    "HIGH": "#dc3545",
+}
+
+
+def stress_properties(cell_id: str, date: str, stress_class: str, confidence: float, ndvi: float, ndwi: float) -> Dict[str, Any]:
+    """Map properties for one cell on the stress layer."""
+    return {
+        "cell_id": cell_id,
+        "date": date,
+        "stress_class": stress_class,
+        "confidence": confidence,
+        "fill_color": STRESS_COLORS[stress_class],
+        "ndvi": round(float(ndvi), 3),
+        "ndwi": round(float(ndwi), 3),
+    }
+
+
+def irrigation_properties(cell_id: str, date: str, advisory: Dict[str, Any], confidence: float, ndvi: float, ndwi: float) -> Dict[str, Any]:
+    """Map properties for one cell on the irrigation layer, with its advice in all three languages."""
+    properties = {
+        "cell_id": cell_id,
+        "date": date,
+        "priority": int(advisory["priority"]),
+        "priority_label": f"Priority {advisory['priority']}",
+        "fill_color": advisory["color"],
+        "confidence": confidence,
+        "ndvi": round(float(ndvi), 3),
+        "ndwi": round(float(ndwi), 3),
+    }
+    for field in ("urgency", "title", "recommendation", "actionable_steps"):
+        for language in ("en", "mr", "hi"):
+            properties[f"{field}_{language}"] = advisory[field][language]
+    return properties
+
+
+def compute_cycle_statistics(date: str, total_cells: int, stress_labels: pd.Series, priorities: pd.Series, ndvi: pd.Series, ndwi: pd.Series) -> Dict[str, Any]:
+    """Area and KPI totals for one date, from its vegetated cells."""
+    crop_cells = len(stress_labels)
+    stress_counts = stress_labels.value_counts().to_dict()
+    priority_counts = priorities.value_counts().to_dict()
+
+    def hectares(count: int) -> float:
+        return round(count * CELL_AREA_HECTARES, 1)
+
+    def percent(count: int) -> float:
+        return round((count / crop_cells) * 100, 1) if crop_cells else 0.0
+
+    high, moderate, low = (stress_counts.get(label, 0) for label in ("HIGH", "MODERATE", "LOW"))
+    p1, p2, p3 = (priority_counts.get(level, 0) for level in (1, 2, 3))
+    return {
+        "cycle_date": date,
+        "total_culturable_cells": int(total_cells),
+        "active_cultivated_cells": crop_cells,
+        "fallow_or_bare_cells": int(total_cells) - crop_cells,
+        "total_cultivated_hectares": hectares(crop_cells),
+        "stress_breakdown": {
+            "high_stress_hectares": hectares(high),
+            "high_stress_pct": percent(high),
+            "moderate_stress_hectares": hectares(moderate),
+            "moderate_stress_pct": percent(moderate),
+            "low_stress_hectares": hectares(low),
+            "low_stress_pct": percent(low),
+        },
+        "irrigation_priority_breakdown": {
+            "priority_1_urgent_ha": hectares(p1),
+            "priority_1_pct": percent(p1),
+            "priority_2_scheduled_ha": hectares(p2),
+            "priority_2_pct": percent(p2),
+            "priority_3_normal_ha": hectares(p3),
+            "priority_3_pct": percent(p3),
+        },
+        "mean_canopy_metrics": {
+            "mean_ndvi": round(float(ndvi.mean()), 3),
+            "mean_ndwi": round(float(ndwi.mean()), 3),
+        },
+    }
+
 
 class AgroScopePredictor:
     """Manages batch and on-demand crop water stress inference and advisory generation."""
@@ -94,6 +175,48 @@ class AgroScopePredictor:
             "prediction": explanation,
             "advisory": advisory,
         }
+
+    def save_all_cycle_results(self, df: pd.DataFrame, output_dir: Path) -> Path:
+        """Save a compact table of results for every date, so any date can be viewed.
+
+        Full maps for all dates would take about 3 GB, mostly repeated advice text and geometry.
+        The API rebuilds a date's map from this table and the grid when it's requested.
+        """
+        total_by_date = df.groupby("date")["cell_id"].nunique()
+        veg_df = df[df["is_vegetated"] == True].copy() if "is_vegetated" in df.columns else df.copy()
+
+        probabilities = self.model.predict_proba(veg_df[self.feature_names])
+        veg_df["stress_code"] = np.argmax(probabilities, axis=1)
+        veg_df["confidence"] = np.max(probabilities, axis=1).round(3)
+        veg_df["priority"] = [
+            self.advisory_engine.evaluate_cell(
+                stress_class=code, confidence=confidence, ndwi_mean=ndwi, temp_max_c=temp, et0_8day_sum=et0, rainfall_8day=rain
+            )["priority"]
+            for code, confidence, ndwi, temp, et0, rain in zip(
+                veg_df["stress_code"], veg_df["confidence"], veg_df["ndwi_mean"], veg_df["temp_max_c"], veg_df["et0_8day_sum"], veg_df["rainfall_8day"]
+            )
+        ]
+
+        columns = ["date", "cell_id", "stress_code", "confidence", "priority", "ndvi_mean", "ndwi_mean", "temp_max_c", "et0_8day_sum", "rainfall_8day"]
+        results_path = output_dir / "cycle_results.csv"
+        veg_df[columns].to_csv(results_path, index=False)
+
+        statistics = {
+            date: compute_cycle_statistics(
+                date,
+                total_by_date[date],
+                group["stress_code"].map(lambda code: CLASS_LABELS[code]),
+                group["priority"],
+                group["ndvi_mean"],
+                group["ndwi_mean"],
+            )
+            for date, group in veg_df.groupby("date")
+        }
+        with open(output_dir / "cycle_statistics_by_date.json", "w", encoding="utf-8") as f:
+            json.dump(statistics, f, indent=2)
+
+        logger.info("Saved results for %d dates to: %s", len(statistics), results_path)
+        return results_path
 
     def run_cycle_inference(
         self,
@@ -178,12 +301,9 @@ class AgroScopePredictor:
                 "confidence": float(row["confidence"]),
                 "priority": int(row["irrigation_priority"]),
                 "color": row["priority_color"],
-                "ndvi": round(float(row["ndvi_mean"]), 3),
-                "ndwi": round(float(row["ndwi_mean"]), 3),
-                "urgency": adv["urgency"],
-                "title": adv["title"],
-                "recommendation": adv["recommendation"],
-                "actionable_steps": adv["actionable_steps"],
+                "ndvi": row["ndvi_mean"],
+                "ndwi": row["ndwi_mean"],
+                "advisory": adv,
             }
 
         # Load grid geometries
@@ -194,61 +314,20 @@ class AgroScopePredictor:
         stress_features: List[Dict[str, Any]] = []
         irrigation_features: List[Dict[str, Any]] = []
 
-        stress_colors = {
-            "LOW": "#28a745",        # Green
-            "MODERATE": "#ffc107",   # Yellow
-            "HIGH": "#dc3545",       # Red
-        }
-
         for feat in grid_data.get("features", []):
             cid = feat.get("properties", {}).get("cell_id")
             if cid in pred_lookup:
                 info = pred_lookup[cid]
-
-                # Stress Map Feature
-                s_feat = {
+                stress_features.append({
                     "type": "Feature",
                     "geometry": feat["geometry"],
-                    "properties": {
-                        "cell_id": cid,
-                        "date": target_date,
-                        "stress_class": info["stress_class"],
-                        "confidence": info["confidence"],
-                        "fill_color": stress_colors[info["stress_class"]],
-                        "ndvi": info["ndvi"],
-                        "ndwi": info["ndwi"],
-                    },
-                }
-                stress_features.append(s_feat)
-
-                # Irrigation Priority Feature (Multilingual properties)
-                i_feat = {
+                    "properties": stress_properties(cid, target_date, info["stress_class"], info["confidence"], info["ndvi"], info["ndwi"]),
+                })
+                irrigation_features.append({
                     "type": "Feature",
                     "geometry": feat["geometry"],
-                    "properties": {
-                        "cell_id": cid,
-                        "date": target_date,
-                        "priority": info["priority"],
-                        "priority_label": f"Priority {info['priority']}",
-                        "fill_color": info["color"],
-                        "confidence": info["confidence"],
-                        "ndvi": info["ndvi"],
-                        "ndwi": info["ndwi"],
-                        "urgency_en": info["urgency"]["en"],
-                        "urgency_mr": info["urgency"]["mr"],
-                        "urgency_hi": info["urgency"]["hi"],
-                        "title_en": info["title"]["en"],
-                        "title_mr": info["title"]["mr"],
-                        "title_hi": info["title"]["hi"],
-                        "recommendation_en": info["recommendation"]["en"],
-                        "recommendation_mr": info["recommendation"]["mr"],
-                        "recommendation_hi": info["recommendation"]["hi"],
-                        "actionable_steps_en": info["actionable_steps"]["en"],
-                        "actionable_steps_mr": info["actionable_steps"]["mr"],
-                        "actionable_steps_hi": info["actionable_steps"]["hi"],
-                    },
-                }
-                irrigation_features.append(i_feat)
+                    "properties": irrigation_properties(cid, target_date, info["advisory"], info["confidence"], info["ndvi"], info["ndwi"]),
+                })
 
         stress_geojson_path = output_dir / "stress_map.geojson"
         with open(stress_geojson_path, "w", encoding="utf-8") as f:
@@ -262,48 +341,18 @@ class AgroScopePredictor:
         logger.info("Saved: %s (%d features)", irrigation_geojson_path, len(irrigation_features))
 
         # Calculate Area & KPI Statistics
-        crop_cells_count = len(veg_df)
-        total_cultivated_ha = round(crop_cells_count * CELL_AREA_HECTARES, 1)
-
-        stress_counts = veg_df["pred_stress_label"].value_counts().to_dict()
-        priority_counts = veg_df["irrigation_priority"].value_counts().to_dict()
-
-        p1_cells = priority_counts.get(1, 0)
-        p2_cells = priority_counts.get(2, 0)
-        p3_cells = priority_counts.get(3, 0)
-
-        stats = {
-            "cycle_date": target_date,
-            "total_culturable_cells": total_cells,
-            "active_cultivated_cells": crop_cells_count,
-            "fallow_or_bare_cells": total_cells - crop_cells_count,
-            "total_cultivated_hectares": total_cultivated_ha,
-            "stress_breakdown": {
-                "high_stress_hectares": round(stress_counts.get("HIGH", 0) * CELL_AREA_HECTARES, 1),
-                "high_stress_pct": round((stress_counts.get("HIGH", 0) / crop_cells_count) * 100, 1),
-                "moderate_stress_hectares": round(stress_counts.get("MODERATE", 0) * CELL_AREA_HECTARES, 1),
-                "moderate_stress_pct": round((stress_counts.get("MODERATE", 0) / crop_cells_count) * 100, 1),
-                "low_stress_hectares": round(stress_counts.get("LOW", 0) * CELL_AREA_HECTARES, 1),
-                "low_stress_pct": round((stress_counts.get("LOW", 0) / crop_cells_count) * 100, 1),
-            },
-            "irrigation_priority_breakdown": {
-                "priority_1_urgent_ha": round(p1_cells * CELL_AREA_HECTARES, 1),
-                "priority_1_pct": round((p1_cells / crop_cells_count) * 100, 1),
-                "priority_2_scheduled_ha": round(p2_cells * CELL_AREA_HECTARES, 1),
-                "priority_2_pct": round((p2_cells / crop_cells_count) * 100, 1),
-                "priority_3_normal_ha": round(p3_cells * CELL_AREA_HECTARES, 1),
-                "priority_3_pct": round((p3_cells / crop_cells_count) * 100, 1),
-            },
-            "mean_canopy_metrics": {
-                "mean_ndvi": round(float(veg_df["ndvi_mean"].mean()), 3),
-                "mean_ndwi": round(float(veg_df["ndwi_mean"].mean()), 3),
-            },
-        }
+        stats = compute_cycle_statistics(
+            target_date, total_cells, veg_df["pred_stress_label"], veg_df["irrigation_priority"], veg_df["ndvi_mean"], veg_df["ndwi_mean"]
+        )
+        crop_cells_count = stats["active_cultivated_cells"]
+        total_cultivated_ha = stats["total_cultivated_hectares"]
 
         stats_path = output_dir / "cycle_statistics.json"
         with open(stats_path, "w", encoding="utf-8") as f:
             json.dump(stats, f, indent=2)
         logger.info("Saved cycle KPI statistics to: %s", stats_path)
+
+        self.save_all_cycle_results(df, output_dir)
 
         # Print Executive Terminal Summary in Selected Language
         l = lang.lower() if lang.lower() in ("en", "mr", "hi") else "en"
