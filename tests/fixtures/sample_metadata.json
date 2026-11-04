@@ -1,0 +1,19 @@
+{
+  "_note": "A sample training result for the CI quality check. Copied from the 2026-11-04 run.",
+  "selected_model": "lightgbm",
+  "metrics": {
+    "random_forest": {"macro_f1": 0.9877},
+    "xgboost": {"macro_f1": 0.9967},
+    "lightgbm": {"macro_f1": 0.9966}
+  },
+  "temporal_metrics": {
+    "random_forest": {"macro_f1": 0.8845},
+    "xgboost": {"macro_f1": 0.915},
+    "lightgbm": {"macro_f1": 0.9242}
+  },
+  "temporal_metrics_without_label_inputs": {
+    "random_forest": {"macro_f1": 0.774},
+    "xgboost": {"macro_f1": 0.7323},
+    "lightgbm": {"macro_f1": 0.6707}
+  }
+}

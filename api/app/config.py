@@ -35,7 +35,7 @@ class Settings:
     METADATA_PATH: Path = MODELS_DIR / "feature_metadata.json"
     DRIFT_SUMMARY_JSON: Path = DATA_DIR / "processed" / "drift_summary.json"
     DRIFT_REPORT_HTML: Path = DATA_DIR / "processed" / "drift_report.html"
-    DRIFT_SIMULATION_JSON: Path = DATA_DIR / "processed" / "drift_simulation_summary.json"
+    DRIFT_SIMULATION_JSON: Path = REPORTS_DIR / "drift_simulation.json"
     PROMOTION_DECISION_JSON: Path = REPORTS_DIR / "promotion_decision.json"
     
     # CORS

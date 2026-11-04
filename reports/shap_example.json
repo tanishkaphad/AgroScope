@@ -1,0 +1,106 @@
+{
+  "model_type": "LGBMClassifier",
+  "note": "`direction` means pushing toward or away from the predicted class, whichever class that is (B-37).",
+  "examples": [
+    {
+      "cell_id": "NLBC_CELL_0115",
+      "date": "2024-03-24",
+      "predicted_class_code": 1,
+      "predicted_class_label": "MODERATE",
+      "confidence": 0.9994,
+      "class_probabilities": {
+        "LOW": 0.0004,
+        "MODERATE": 0.9994,
+        "HIGH": 0.0002
+      },
+      "key_drivers": [
+        {
+          "feature": "et0_8day_sum",
+          "label": "8-Day Reference Evapotranspiration (ETo)",
+          "value": 57.69,
+          "impact_pct": 36.4,
+          "direction": "increases_stress",
+          "arrow": "↑",
+          "summary": "↑ 8-Day Reference Evapotranspiration (ETo) (57.69) — Contributes 36.4% to MODERATE"
+        },
+        {
+          "feature": "ndwi_mean",
+          "label": "Canopy Leaf Water Content",
+          "value": 0.175,
+          "impact_pct": 28.3,
+          "direction": "increases_stress",
+          "arrow": "↑",
+          "summary": "↑ Canopy Leaf Water Content (0.17) — Contributes 28.3% to MODERATE"
+        },
+        {
+          "feature": "et0_16day_sum",
+          "label": "16-Day Cumulative Evapotranspiration Demand",
+          "value": 113.35,
+          "impact_pct": 8.7,
+          "direction": "increases_stress",
+          "arrow": "↑",
+          "summary": "↑ 16-Day Cumulative Evapotranspiration Demand (113.35) — Contributes 8.7% to MODERATE"
+        },
+        {
+          "feature": "evi_mean",
+          "label": "Enhanced Canopy Biomass Index",
+          "value": 0.349,
+          "impact_pct": 5.5,
+          "direction": "increases_stress",
+          "arrow": "↑",
+          "summary": "↑ Enhanced Canopy Biomass Index (0.35) — Contributes 5.5% to MODERATE"
+        }
+      ]
+    },
+    {
+      "cell_id": "NLBC_CELL_0008",
+      "date": "2024-03-24",
+      "predicted_class_code": 2,
+      "predicted_class_label": "HIGH",
+      "confidence": 0.9999,
+      "class_probabilities": {
+        "LOW": 0.0,
+        "MODERATE": 0.0001,
+        "HIGH": 0.9999
+      },
+      "key_drivers": [
+        {
+          "feature": "et0_8day_sum",
+          "label": "8-Day Reference Evapotranspiration (ETo)",
+          "value": 57.69,
+          "impact_pct": 63.1,
+          "direction": "increases_stress",
+          "arrow": "↑",
+          "summary": "↑ 8-Day Reference Evapotranspiration (ETo) (57.69) — Contributes 63.1% to HIGH"
+        },
+        {
+          "feature": "et0_16day_sum",
+          "label": "16-Day Cumulative Evapotranspiration Demand",
+          "value": 113.35,
+          "impact_pct": 7.5,
+          "direction": "increases_stress",
+          "arrow": "↑",
+          "summary": "↑ 16-Day Cumulative Evapotranspiration Demand (113.35) — Contributes 7.5% to HIGH"
+        },
+        {
+          "feature": "rainfall_8day",
+          "label": "Recent 8-Day Cumulative Rainfall",
+          "value": 0.0,
+          "impact_pct": 7.3,
+          "direction": "increases_stress",
+          "arrow": "↑",
+          "summary": "↑ Recent 8-Day Cumulative Rainfall (0.00) — Contributes 7.3% to HIGH"
+        },
+        {
+          "feature": "ndvi_mean",
+          "label": "Vegetation Greenness & Canopy Vigor",
+          "value": 0.334,
+          "impact_pct": 4.2,
+          "direction": "increases_stress",
+          "arrow": "↑",
+          "summary": "↑ Vegetation Greenness & Canopy Vigor (0.33) — Contributes 4.2% to HIGH"
+        }
+      ]
+    }
+  ]
+}

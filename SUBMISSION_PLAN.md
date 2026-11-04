@@ -2,7 +2,7 @@
 
 How we'll meet the MLOps course rubric in the 2 days left from 2026-11-04. The long-term product roadmap is in [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md), and pauses until this is done.
 
-**Status:** sections 1-3 done, sections 4-8 to do.
+**Status:** sections 1-6 done, except that CI still needs checking on GitHub. Sections 7-8 to do.
 
 **Rules:** Claude runs no git commands, and every service stays free.
 
@@ -75,9 +75,9 @@ How we'll meet the MLOps course rubric in the 2 days left from 2026-11-04. The l
 
 ## 4. CI additions
 
-- [ ] Add a job that builds the Docker image in GitHub Actions, using small placeholder model and data files.
-- [ ] Add preprocessing and prediction unit tests that use a tiny test model, so they run in CI instead of skipping.
-- [ ] Run the model-quality check in CI against a sample result.
+- [x] Add a job that builds the Docker image in GitHub Actions, using small placeholder model and data files.
+- [x] Add preprocessing and prediction unit tests that use a tiny test model, so they run in CI instead of skipping.
+- [x] Run the model-quality check in CI against a sample result.
 
 **Files:** `.github/workflows/ci.yml`, `tests/`.
 
@@ -85,12 +85,12 @@ How we'll meet the MLOps course rubric in the 2 days left from 2026-11-04. The l
 
 ## 5. Responsible AI documents
 
-- [ ] Write `docs/MODEL_CARD.md`: purpose, data, all three scores, the leakage finding and limits.
-- [ ] Write `docs/DATA_CARD.md`: sources, licences, dates, labels, known problems and storage.
-- [ ] Write `docs/RESPONSIBLE_AI.md`: intended use, decision-support-only use, privacy, ethical limits and data credits.
-- [ ] Add a fairness note: the data has no demographic variables, so results are compared by area instead.
-- [ ] Add a script that reports model scores for each area of the canal.
-- [ ] Confirm SHAP output works and include an example.
+- [x] Write `docs/MODEL_CARD.md`: purpose, data, all three scores, the leakage finding and limits.
+- [x] Write `docs/DATA_CARD.md`: sources, licences, dates, labels, known problems and storage.
+- [x] Write `docs/RESPONSIBLE_AI.md`: intended use, decision-support-only use, privacy, ethical limits and data credits.
+- [x] Add a fairness note: the data has no demographic variables, so results are compared by area instead.
+- [x] Add a script that reports model scores for each area of the canal.
+- [x] Confirm SHAP output works and include an example.
 
 **Done when:** all three documents match the current results.
 
@@ -98,11 +98,11 @@ How we'll meet the MLOps course rubric in the 2 days left from 2026-11-04. The l
 
 **Goal:** real measurements for every number the rubric asks for.
 
-- [ ] Add `scripts/load_test.py` to measure p95 latency, throughput and error rate.
-- [ ] Add `scripts/simulate_drift.py`, shifting temperature, rainfall and NDWI, then show the results in Evidently and Grafana.
-- [ ] Measure model performance when labels become available, using later dates held back from training.
-- [ ] Define the business metric: hectares flagged for priority irrigation per cycle, with a clear note that it isn't validated against field outcomes.
-- [ ] Write `reports/performance_report.md` with the model metric, business metric, p95 latency, throughput, error rate and drift metric.
+- [x] Add `scripts/load_test.py` to measure p95 latency, throughput and error rate.
+- [x] Add `scripts/simulate_drift.py`, shifting temperature, rainfall and NDWI, then show the results in Evidently and Grafana.
+- [x] Measure model performance when labels become available, using later dates held back from training.
+- [x] Define the business metric: hectares flagged for priority irrigation per cycle, with a clear note that it isn't validated against field outcomes.
+- [x] Write `reports/performance_report.md` with the model metric, business metric, p95 latency, throughput, error rate and drift metric.
 
 **Done when:** every number in the report comes from a saved run, with nothing estimated by hand.
 

@@ -1,0 +1,70 @@
+{
+  "measured_at": "2026-11-04T12:01:24.947417+00:00",
+  "base_url": "http://localhost:8000",
+  "model_version": "lightgbm-ac395666",
+  "users": 10,
+  "duration_s": 60.1,
+  "note": "Run on one local computer, with the client and API sharing its resources.",
+  "overall": {
+    "requests": 10257,
+    "errors": 0,
+    "error_rate": 0.0,
+    "throughput_rps": 170.79,
+    "latency_ms": {
+      "p50": 39.7,
+      "p95": 150.5,
+      "p99": 187.4,
+      "max": 423.1
+    }
+  },
+  "by_request": {
+    "statistics": {
+      "requests": 3129,
+      "errors": 0,
+      "error_rate": 0.0,
+      "throughput_rps": 52.1,
+      "latency_ms": {
+        "p50": 26.2,
+        "p95": 59.4,
+        "p99": 80.9,
+        "max": 345.2
+      }
+    },
+    "cell_details": {
+      "requests": 3033,
+      "errors": 0,
+      "error_rate": 0.0,
+      "throughput_rps": 50.5,
+      "latency_ms": {
+        "p50": 27.0,
+        "p95": 59.6,
+        "p99": 79.8,
+        "max": 343.4
+      }
+    },
+    "predict": {
+      "requests": 3023,
+      "errors": 0,
+      "error_rate": 0.0,
+      "throughput_rps": 50.34,
+      "latency_ms": {
+        "p50": 118.1,
+        "p95": 176.7,
+        "p99": 211.8,
+        "max": 423.1
+      }
+    },
+    "map_sample": {
+      "requests": 1072,
+      "errors": 0,
+      "error_rate": 0.0,
+      "throughput_rps": 17.85,
+      "latency_ms": {
+        "p50": 47.1,
+        "p95": 82.8,
+        "p99": 106.5,
+        "max": 345.3
+      }
+    }
+  }
+}

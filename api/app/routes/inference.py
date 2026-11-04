@@ -68,8 +68,11 @@ async def get_parcel_detail(
 
 
 @router.post("/predict", response_model=PredictResponse)
-async def predict_on_demand(payload: PredictRequest):
-    """Run real-time what-if inference on custom agro-climatic & satellite parameters."""
+def predict_on_demand(payload: PredictRequest):
+    """Run real-time what-if inference on custom agro-climatic & satellite parameters.
+
+    A plain function, so FastAPI runs it in a worker thread and slow inference can't block other requests.
+    """
     metrics_service.increment_request()
 
     if not model_service.is_loaded():

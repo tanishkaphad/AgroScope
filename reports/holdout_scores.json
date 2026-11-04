@@ -1,0 +1,137 @@
+{
+  "model_type": "lightgbm",
+  "note": "Trained only on dates before the split. Labels are formula-based, not field observations.",
+  "split_date": "2024-02-01",
+  "train_rows": 308726,
+  "overall": {
+    "rows": 231126,
+    "macro_f1": 0.9242,
+    "accuracy": 0.9786,
+    "high_stress_recall": 0.9823,
+    "classes_present": 3
+  },
+  "by_date": {
+    "2024-02-03": {
+      "rows": 21448,
+      "macro_f1": 0.9919,
+      "accuracy": 0.9935,
+      "high_stress_recall": 0.9922,
+      "classes_present": 3
+    },
+    "2024-02-08": {
+      "rows": 20868,
+      "macro_f1": 0.9922,
+      "accuracy": 0.9958,
+      "high_stress_recall": 0.9956,
+      "classes_present": 3
+    },
+    "2024-02-13": {
+      "rows": 21251,
+      "macro_f1": 0.9862,
+      "accuracy": 0.9936,
+      "high_stress_recall": 0.9942,
+      "classes_present": 3
+    },
+    "2024-02-18": {
+      "rows": 21103,
+      "macro_f1": 0.9848,
+      "accuracy": 0.994,
+      "high_stress_recall": 0.995,
+      "classes_present": 3
+    },
+    "2024-02-23": {
+      "rows": 21028,
+      "macro_f1": 0.8859,
+      "accuracy": 0.9781,
+      "high_stress_recall": 0.9917,
+      "classes_present": 3
+    },
+    "2024-02-28": {
+      "rows": 18870,
+      "macro_f1": 0.9458,
+      "accuracy": 0.9897,
+      "high_stress_recall": 0.9961,
+      "classes_present": 3
+    },
+    "2024-03-04": {
+      "rows": 20796,
+      "macro_f1": 0.8063,
+      "accuracy": 0.9795,
+      "high_stress_recall": 0.9891,
+      "classes_present": 3
+    },
+    "2024-03-09": {
+      "rows": 20304,
+      "macro_f1": 0.8597,
+      "accuracy": 0.9643,
+      "high_stress_recall": 0.9728,
+      "classes_present": 2
+    },
+    "2024-03-14": {
+      "rows": 20047,
+      "macro_f1": 0.8179,
+      "accuracy": 0.9553,
+      "high_stress_recall": 0.9616,
+      "classes_present": 2
+    },
+    "2024-03-19": {
+      "rows": 19574,
+      "macro_f1": 0.7669,
+      "accuracy": 0.9606,
+      "high_stress_recall": 0.9659,
+      "classes_present": 2
+    },
+    "2024-03-24": {
+      "rows": 19300,
+      "macro_f1": 0.7633,
+      "accuracy": 0.962,
+      "high_stress_recall": 0.9661,
+      "classes_present": 2
+    },
+    "2024-03-29": {
+      "rows": 6537,
+      "macro_f1": 0.7849,
+      "accuracy": 0.9608,
+      "high_stress_recall": 0.9713,
+      "classes_present": 2
+    }
+  },
+  "by_reach": {
+    "head": {
+      "rows": 51173,
+      "macro_f1": 0.9145,
+      "accuracy": 0.9864,
+      "high_stress_recall": 0.99,
+      "classes_present": 3
+    },
+    "middle": {
+      "rows": 95596,
+      "macro_f1": 0.9239,
+      "accuracy": 0.9788,
+      "high_stress_recall": 0.9827,
+      "classes_present": 3
+    },
+    "tail": {
+      "rows": 84357,
+      "macro_f1": 0.9269,
+      "accuracy": 0.9736,
+      "high_stress_recall": 0.9765,
+      "classes_present": 3
+    }
+  },
+  "reach_longitude_bands": {
+    "head": [
+      74.054,
+      74.374
+    ],
+    "middle": [
+      74.375,
+      74.693
+    ],
+    "tail": [
+      74.695,
+      75.014
+    ]
+  },
+  "largest_gap_between_reaches": 0.0124
+}

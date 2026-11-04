@@ -24,7 +24,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements-dev.txt
 
-      - name: Pull Model and Results with DVC
+      - name: Get Model and Results
         env:
           GDRIVE_CREDENTIALS_DATA: ${{ secrets.GDRIVE_CREDENTIALS_DATA }}
         run: |
@@ -32,12 +32,55 @@ jobs:
             dvc remote modify --local gdrive gdrive_use_service_account true
             dvc pull promote_model predict_cycle
           else
-            echo "GDRIVE_CREDENTIALS_DATA isn't set, so tests that need these files will be skipped."
+            echo "GDRIVE_CREDENTIALS_DATA isn't set, so tests run against synthetic placeholder files."
+            python scripts/make_placeholder_artifacts.py
           fi
 
       - name: Run Backend Pytest Suite
         run: |
           pytest tests -v
+
+      - name: Check Model Quality Against a Sample Result
+        run: |
+          python src/training/evaluate.py --metadata tests/fixtures/sample_metadata.json --output "$RUNNER_TEMP/evaluation_result.json" --strict
+
+  build-image:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: "pip"
+
+      - name: Create Placeholder Model and Data
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          python scripts/make_placeholder_artifacts.py
+
+      - name: Build API Image
+        run: |
+          docker build -t agroscope-api:ci .
+
+      - name: Start the Image and Test It
+        run: |
+          docker run -d --name agroscope-api -p 8000:8000 agroscope-api:ci
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://localhost:8000/health; then break; fi
+            sleep 2
+          done
+          curl -fsS http://localhost:8000/health | grep '"status":"HEALTHY"'
+          curl -fsS -X POST http://localhost:8000/predict -H 'Content-Type: application/json' -d '{"ndwi_mean": -0.2}' | grep '"predicted_class"'
+          curl -fsS http://localhost:8000/metrics/prometheus | grep agroscope_predictions_total
+
+      - name: Show Container Logs on Failure
+        if: failure()
+        run: |
+          docker logs agroscope-api
 
   build-frontend:
     runs-on: ubuntu-latest

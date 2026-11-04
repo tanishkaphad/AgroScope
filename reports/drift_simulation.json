@@ -1,0 +1,216 @@
+{
+  "simulated": true,
+  "evaluated_at": "2026-11-04T11:58:43.515117+00:00",
+  "note": "Simulated data, not a real result.",
+  "shifts": {
+    "temperature_c": 4.0,
+    "rainfall_mm": 20.0,
+    "ndwi": -0.1
+  },
+  "rows_per_sample": 20000,
+  "control_drifted_share": 0.0,
+  "drifted_share": 0.36,
+  "drift_share_alert": 0.5,
+  "alert_triggered": false,
+  "shifted_inputs": [
+    "ndwi_mean",
+    "rainfall_16day",
+    "rainfall_30day",
+    "rainfall_8day",
+    "temp_30day_mean",
+    "temp_8day_max",
+    "temp_8day_mean",
+    "temp_max_c",
+    "temp_mean_c"
+  ],
+  "shifted_inputs_flagged": [
+    "ndwi_mean",
+    "rainfall_16day",
+    "rainfall_30day",
+    "rainfall_8day",
+    "temp_30day_mean",
+    "temp_8day_max",
+    "temp_8day_mean",
+    "temp_max_c",
+    "temp_mean_c"
+  ],
+  "shifted_inputs_missed": [],
+  "unshifted_inputs_flagged": [],
+  "features": [
+    {
+      "feature": "b02_mean",
+      "test": "Wasserstein distance (normed)",
+      "score": 0.0132,
+      "threshold": 0.1,
+      "drift": false
+    },
+    {
+      "feature": "b03_mean",
+      "test": "Wasserstein distance (normed)",
+      "score": 0.0146,
+      "threshold": 0.1,
+      "drift": false
+    },
+    {
+      "feature": "b04_mean",
+      "test": "Wasserstein distance (normed)",
+      "score": 0.0121,
+      "threshold": 0.1,
+      "drift": false
+    },
+    {
+      "feature": "b08_mean",
+      "test": "Wasserstein distance (normed)",
+      "score": 0.0171,
+      "threshold": 0.1,
+      "drift": false
+    },
+    {
+      "feature": "b11_mean",
+      "test": "Wasserstein distance (normed)",
+      "score": 0.0117,
+      "threshold": 0.1,
+      "drift": false
+    },
+    {
+      "feature": "b12_mean",
+      "test": "Wasserstein distance (normed)",
+      "score": 0.0104,
+      "threshold": 0.1,
+      "drift": false
+    },
+    {
+      "feature": "et0_16day_sum",
+      "test": "Wasserstein distance (normed)",
+      "score": 0.0212,
+      "threshold": 0.1,
+      "drift": false
+    },
+    {
+      "feature": "et0_8day_sum",
+      "test": "Wasserstein distance (normed)",
+      "score": 0.0132,
+      "threshold": 0.1,
+      "drift": false
+    },
+    {
+      "feature": "evi_mean",
+      "test": "Wasserstein distance (normed)",
+      "score": 0.0116,
+      "threshold": 0.1,
+      "drift": false
+    },
+    {
+      "feature": "evi_std",
+      "test": "Wasserstein distance (normed)",
+      "score": 0.012,
+      "threshold": 0.1,
+      "drift": false
+    },
+    {
+      "feature": "humidity_pct",
+      "test": "Wasserstein distance (normed)",
+      "score": 0.0232,
+      "threshold": 0.1,
+      "drift": false
+    },
+    {
+      "feature": "ndvi_mean",
+      "test": "Wasserstein distance (normed)",
+      "score": 0.0066,
+      "threshold": 0.1,
+      "drift": false
+    },
+    {
+      "feature": "ndvi_std",
+      "test": "Wasserstein distance (normed)",
+      "score": 0.0104,
+      "threshold": 0.1,
+      "drift": false
+    },
+    {
+      "feature": "ndwi_mean",
+      "test": "Wasserstein distance (normed)",
+      "score": 1.0682,
+      "threshold": 0.1,
+      "drift": true
+    },
+    {
+      "feature": "ndwi_std",
+      "test": "Wasserstein distance (normed)",
+      "score": 0.0105,
+      "threshold": 0.1,
+      "drift": false
+    },
+    {
+      "feature": "rainfall_16day",
+      "test": "Wasserstein distance (normed)",
+      "score": 0.3197,
+      "threshold": 0.1,
+      "drift": true
+    },
+    {
+      "feature": "rainfall_30day",
+      "test": "Wasserstein distance (normed)",
+      "score": 0.2122,
+      "threshold": 0.1,
+      "drift": true
+    },
+    {
+      "feature": "rainfall_8day",
+      "test": "Wasserstein distance (normed)",
+      "score": 0.8637,
+      "threshold": 0.1,
+      "drift": true
+    },
+    {
+      "feature": "solar_radiation_mj",
+      "test": "Wasserstein distance (normed)",
+      "score": 0.0167,
+      "threshold": 0.1,
+      "drift": false
+    },
+    {
+      "feature": "temp_30day_mean",
+      "test": "Wasserstein distance (normed)",
+      "score": 2.6985,
+      "threshold": 0.1,
+      "drift": true
+    },
+    {
+      "feature": "temp_8day_max",
+      "test": "Wasserstein distance (normed)",
+      "score": 3.0978,
+      "threshold": 0.1,
+      "drift": true
+    },
+    {
+      "feature": "temp_8day_mean",
+      "test": "Wasserstein distance (normed)",
+      "score": 2.2265,
+      "threshold": 0.1,
+      "drift": true
+    },
+    {
+      "feature": "temp_max_c",
+      "test": "Wasserstein distance (normed)",
+      "score": 2.4552,
+      "threshold": 0.1,
+      "drift": true
+    },
+    {
+      "feature": "temp_mean_c",
+      "test": "Wasserstein distance (normed)",
+      "score": 1.9757,
+      "threshold": 0.1,
+      "drift": true
+    },
+    {
+      "feature": "wind_speed_mps",
+      "test": "Wasserstein distance (normed)",
+      "score": 0.0062,
+      "threshold": 0.1,
+      "drift": false
+    }
+  ]
+}
