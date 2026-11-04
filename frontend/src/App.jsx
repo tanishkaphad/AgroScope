@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, Calendar, Clock, MapIcon } from 'lucide-react';
+import { AlertTriangle, Calendar, Clock, MapIcon, ExternalLink } from 'lucide-react';
 import Header from './components/Header';
 import KpiBar from './components/KpiBar';
 import MapContainer from './components/MapContainer';
@@ -15,6 +15,7 @@ import {
   fetchStressMap,
   fetchIrrigationMap,
 } from './services/api';
+import { DASHBOARD_LINKS } from './services/api';
 
 const DATE_DATA = { stats: null, stressMap: null, irrigationMap: null };
 const MAP_CELL_LIMIT = 1500;
@@ -113,6 +114,7 @@ export default function App() {
 
   return (
     <div className="app-container" id="agroscope-app">
+      <section className="dashboard-hero" aria-label={t.appTitle}>
       <Header
         t={t}
         currentLang={currentLang}
@@ -130,6 +132,24 @@ export default function App() {
           </button>
         </div>
       )}
+
+      <section className="dashboard-heading" aria-labelledby="dashboard-title">
+        <div>
+          <p className="dashboard-eyebrow">{t.tagline}</p>
+          <h2 id="dashboard-title">{t.area}</h2>
+        </div>
+        <p className="dashboard-caption">{t.pastDataHelp}</p>
+      </section>
+      <nav className="tools-bar hero-tools" id="tools-bar" aria-label={t.tools}>
+        <span className="tools-label">{t.tools}:</span>
+        {DASHBOARD_LINKS.map(({ key, label, url }) => (
+          <a key={key} id={`tool-link-${key}`} className="tool-link" href={url} target="_blank" rel="noreferrer" title={t.toolHelp[key]}>
+            <span>{label}</span><ExternalLink size={11} aria-hidden="true" />
+            <span className="visually-hidden">{t.toolHelp[key]}</span>
+          </a>
+        ))}
+      </nav>
+      </section>
 
       <section className="data-context-bar" id="data-context-bar" aria-live="polite">
         <div className="context-item context-date">

@@ -6,8 +6,10 @@ function KpiCard({ id, variant, label, icon, value, unit, subtext, help, isLoadi
   return (
     <div className={`kpi-card ${variant}`} id={id} title={help} aria-busy={isLoading}>
       <div className="kpi-header">
-        <span className="kpi-label">{label}</span>
-        {icon}
+        <div className="kpi-heading">
+          <span className="kpi-icon-badge">{icon}</span>
+          <span className="kpi-label">{label}</span>
+        </div>
       </div>
       {isLoading ? (
         <>

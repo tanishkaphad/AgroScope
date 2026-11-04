@@ -1,6 +1,5 @@
 import React from 'react';
-import { Activity, ExternalLink } from 'lucide-react';
-import { DASHBOARD_LINKS } from '../services/api';
+import { Activity, Sprout } from 'lucide-react';
 
 const LANGUAGES = [
   { code: 'en', label: 'EN' },
@@ -15,12 +14,12 @@ export default function Header({ t, currentLang, onLangChange, onOpenMlops, syst
     <header className="header-bar" id="app-header">
       <div className="brand-wrapper">
         <div className="brand-icon-box" id="brand-logo" aria-hidden="true">
-          🛰️
+          <Sprout size={21} strokeWidth={2.2} />
         </div>
         <div className="brand-title-group">
           <h1>{t.appTitle}</h1>
           <div className="brand-subtitle">
-            {t.tagline} <span className="brand-area">{t.area}</span>
+            {t.tagline}
           </div>
         </div>
       </div>
@@ -58,16 +57,6 @@ export default function Header({ t, currentLang, onLangChange, onOpenMlops, syst
         </div>
       </div>
 
-      <nav className="tools-bar" id="tools-bar" aria-label={t.tools}>
-        <span className="tools-label">{t.tools}:</span>
-        {DASHBOARD_LINKS.map(({ key, label, url }) => (
-          <a key={key} id={`tool-link-${key}`} className="tool-link" href={url} target="_blank" rel="noreferrer" title={t.toolHelp[key]}>
-            <span>{label}</span>
-            <ExternalLink size={11} aria-hidden="true" />
-            <span className="visually-hidden">{t.toolHelp[key]}</span>
-          </a>
-        ))}
-      </nav>
     </header>
   );
 }
