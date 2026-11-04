@@ -1,0 +1,83 @@
+# Starts the AgroScope API with experiment tracking and live monitoring: docker compose up --build
+#
+#   API and docs  http://localhost:8000/docs
+#   MLflow        http://localhost:5000
+#   Prometheus    http://localhost:9090
+#   Grafana       http://localhost:3000
+
+services:
+  api:
+    build: .
+    image: agroscope-api:local
+    ports:
+      - "${API_PORT:-8000}:8000"
+    volumes:
+      # The image holds a copy from build time. These show the pipeline's latest results instead.
+      - ./models:/app/models:ro
+      - ./data/processed:/app/data/processed:ro
+      - ./reports:/app/reports:ro
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 60s
+    restart: unless-stopped
+
+  mlflow:
+    build:
+      context: .
+      dockerfile: docker/mlflow.Dockerfile
+    image: agroscope-mlflow:local
+    command: >
+      mlflow server
+      --host 0.0.0.0
+      --port 5000
+      --workers 1
+      --backend-store-uri sqlite:////mlflow/mlflow.db
+      --artifacts-destination /mlflow/artifacts
+      --allowed-hosts localhost:5000,127.0.0.1:5000,mlflow:5000
+    ports:
+      - "5000:5000"
+    volumes:
+      # Runs and the model registry live here. `docker compose down -v` deletes them.
+      - mlflow_data:/mlflow
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request as u; u.urlopen('http://localhost:5000/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  prometheus:
+    image: quay.io/prometheus/prometheus:v3.5.0
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    depends_on:
+      - api
+    restart: unless-stopped
+
+  grafana:
+    image: mirror.gcr.io/grafana/grafana:12.1.0
+    ports:
+      - "3000:3000"
+    environment:
+      # Local demo only: anyone can view the dashboard without signing in.
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/agroscope.json
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+
+volumes:
+  mlflow_data:
+  prometheus_data:
+  grafana_data:

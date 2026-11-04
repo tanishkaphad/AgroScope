@@ -223,7 +223,6 @@ def test_gate_promotes_better_model_and_keeps_champion_over_worse_one(tmp_path, 
     artifact_root = (tmp_path / "artifacts").as_uri()
     monkeypatch.setattr(tracking, "TRACKING_URI", f"sqlite:///{(tmp_path / 'mlflow.db').as_posix()}")
     monkeypatch.setattr(tracking, "ARTIFACT_ROOT", artifact_root)
-    monkeypatch.setattr(promote, "ARTIFACT_ROOT", artifact_root)
     production = tmp_path / "production"
     decision_path = tmp_path / "decision.json"
 

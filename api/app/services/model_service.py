@@ -14,6 +14,7 @@ from typing import Any, Dict, Optional
 from pathlib import Path
 
 from api.app.config import settings
+from api.app.services.prometheus_service import INFERENCE_LATENCY, PREDICTIONS
 from src.inference.predict import AgroScopePredictor
 
 logger = logging.getLogger("agroscope.model_service")
@@ -55,7 +56,10 @@ class ModelService:
             raise RuntimeError("Model predictor is not initialized.")
 
         self.total_inferences += 1
-        return self.predictor.predict_instance(payload)
+        with INFERENCE_LATENCY.time():
+            result = self.predictor.predict_instance(payload)
+        PREDICTIONS.labels(stress_class=result["prediction"]["predicted_class_label"]).inc()
+        return result
 
     def is_loaded(self) -> bool:
         return self.predictor is not None and self.predictor.model is not None

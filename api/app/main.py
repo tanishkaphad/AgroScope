@@ -7,10 +7,11 @@ Compatible with Railway Free Tier, Docker, and Cloudflare Pages frontend.
 from __future__ import annotations
 
 import logging
+import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -19,6 +20,7 @@ from api.app.config import settings
 from api.app.routes import health, geo, stats, inference, mlops
 from api.app.services.model_service import model_service
 from api.app.services.geo_service import geo_service
+from api.app.services.prometheus_service import REQUEST_LATENCY, REQUESTS
 
 logging.basicConfig(
     level=logging.INFO,
@@ -56,6 +58,22 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def record_request_metrics(request: Request, call_next):
+    """Count every request and time it, labelled by route template to keep the label set small."""
+    started = time.perf_counter()
+    status = 500
+    try:
+        response = await call_next(request)
+        status = response.status_code
+        return response
+    finally:
+        route = getattr(request.scope.get("route"), "path", "unmatched")
+        REQUESTS.labels(method=request.method, route=route, status=str(status)).inc()
+        REQUEST_LATENCY.labels(route=route).observe(time.perf_counter() - started)
+
 
 # Register routers under /api/v1
 app.include_router(health.router, prefix=settings.API_V1_STR)

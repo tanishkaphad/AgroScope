@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from fastapi import APIRouter
+from fastapi import APIRouter, Response
+from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from api.app.schemas.schemas import HealthResponse, MetricsResponse
 from api.app.services.geo_service import geo_service
 from api.app.services.model_service import model_service
 from api.app.services.metrics_service import metrics_service
+from api.app.services.prometheus_service import refresh_pipeline_gauges
 
 router = APIRouter(tags=["Monitoring & Health"])
 
@@ -42,3 +44,10 @@ async def get_system_metrics():
         memory_rss_mb=sys_stats["memory_rss_mb"],
         timestamp=datetime.now(timezone.utc).isoformat(),
     )
+
+
+@router.get("/metrics/prometheus", include_in_schema=False)
+async def get_prometheus_metrics() -> Response:
+    """Metrics in Prometheus format. The JSON /metrics endpoint is separate and unchanged."""
+    refresh_pipeline_gauges(model_service.is_loaded())
+    return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)

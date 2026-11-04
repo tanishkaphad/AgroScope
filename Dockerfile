@@ -1,5 +1,5 @@
 # Multi-stage lightweight Dockerfile for AgroScope FastAPI Backend
-FROM python:3.10-slim AS builder
+FROM mirror.gcr.io/library/python:3.10-slim AS builder
 
 WORKDIR /app
 
@@ -12,7 +12,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir --user -r requirements.txt
 
 # Final Runtime Stage
-FROM python:3.10-slim
+FROM mirror.gcr.io/library/python:3.10-slim
 
 WORKDIR /app
 

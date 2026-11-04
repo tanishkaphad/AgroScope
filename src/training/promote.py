@@ -23,7 +23,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.config import settings
-from src.training.tracking import ARTIFACT_ROOT, TRACKING, get_client
+from src.training.tracking import TRACKING, get_client
 
 logging.basicConfig(
     level=logging.INFO,
@@ -81,7 +81,7 @@ def run_promotion_gate(
     existing = client.search_model_versions(f"name='{registered_name}' and run_id='{candidate_run_id}'")
     version = existing[0] if existing else client.create_model_version(
         registered_name,
-        source=f"{ARTIFACT_ROOT}/{client.get_run(candidate_run_id).info.experiment_id}/{candidate_run_id}/artifacts/model_files",
+        source=f"{client.get_run(candidate_run_id).info.artifact_uri}/model_files",
         run_id=candidate_run_id,
     )
 

@@ -95,6 +95,20 @@ pytest tests -v
 
 **Point out:** the tests cover the API's error handling, weather and satellite ingestion, the promotion gate rejecting a worse model, and drift parsing. GitHub Actions runs them too.
 
+### 7. Packaged API
+
+```powershell
+docker build -t agroscope-api:local .
+```
+
+```powershell
+docker run --rm -p 8000:8000 agroscope-api:local
+```
+
+Stop the normal API first, because both use port 8000. The dashboard is then at http://localhost:8000/dashboard/.
+
+**Point out:** the image carries the champion model, results and API, but not the training tools, so `/retrain` is disabled there. The image is about 2.7 GB. Building it needs `dvc pull` and `npm run build --prefix frontend` first on a fresh clone.
+
 ## Honest results
 
 These are measured against labels calculated from a formula, not field observations.
@@ -133,7 +147,7 @@ On one tested scene, 827 KB instead of 198 MB.
 Say this before you're asked:
 
 - **From the full problem statement:** crop type classification, growth-stage stress and Sentinel-1 radar data.
-- **Live operation:** scheduled runs and a live deployment.
+- **Live operation:** scheduled runs and a public deployment. The API runs in Docker locally.
 - **Data limits:** one season of model data, and no field validation.
 - **Reported area:** the 120,625 ha vegetated area is larger than the 84,500 ha gross command area in the study area file, so the boundary and NDVI threshold need checking.
 - **MLflow history:** runs are stored locally, so a fresh clone starts with no champion.

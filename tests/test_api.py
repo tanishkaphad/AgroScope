@@ -244,3 +244,34 @@ def test_dashboard_endpoint():
     response = client.get("/dashboard/")
     assert response.status_code == 200
     assert "AgroScope" in response.text
+
+
+def test_prometheus_endpoint_records_requests_by_route_template():
+    client.get("/area/DOES_NOT_EXIST")
+    body = client.get("/metrics/prometheus").text
+    assert 'route="/area/{cell_id}"' in body
+    assert "DOES_NOT_EXIST" not in body
+    assert "agroscope_model_loaded" in body
+
+
+def test_json_metrics_endpoint_stays_json():
+    assert client.get("/metrics").json()["uptime_seconds"] >= 0
+
+
+@needs_model
+def test_prediction_is_counted_by_class_and_timed():
+    client.post("/predict", json={"ndvi_mean": 0.18, "ndwi_mean": -0.05})
+    body = client.get("/metrics/prometheus").text
+    assert "agroscope_predictions_total{stress_class=" in body
+    assert "agroscope_inference_duration_seconds_count" in body
+
+
+def test_drift_gauge_reads_both_scenarios(tmp_path, monkeypatch):
+    published, simulated = tmp_path / "published.json", tmp_path / "simulated.json"
+    published.write_text(json.dumps({"drifted_share": 0.25}), encoding="utf-8")
+    simulated.write_text(json.dumps({"drifted_share": 0.75}), encoding="utf-8")
+    monkeypatch.setattr(settings, "DRIFT_SUMMARY_JSON", published)
+    monkeypatch.setattr(settings, "DRIFT_SIMULATION_JSON", simulated)
+    body = client.get("/metrics/prometheus").text
+    assert 'agroscope_drift_share{scenario="published"} 0.25' in body
+    assert 'agroscope_drift_share{scenario="simulated"} 0.75' in body

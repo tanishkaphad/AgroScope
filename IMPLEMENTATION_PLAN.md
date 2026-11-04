@@ -10,6 +10,39 @@
 
 **Cost rule:** every external service stays on a free tier. Check current limits before adopting one.
 
+## Course submission checklist
+
+From the MLOps course project list. This comes first until submission, and [SUBMISSION_PLAN.md](SUBMISSION_PLAN.md) has the detailed steps.
+
+### Still to build
+
+- [ ] **Airflow DAG:** data ingestion, validation, preprocessing, feature engineering, training, evaluation and model registration, with a successful-run screenshot.
+- [ ] **Data validation step:** the DAG needs one, and the pipeline doesn't have it yet.
+- [ ] **Prometheus and Grafana:** request count, error rate, latency, prediction distribution and drift.
+- [ ] **Docker Compose:** one-command setup for the API and monitoring.
+- [ ] **Models:** add a second candidate, so there's one baseline and two candidates, all logged in MLflow.
+- [ ] **Promotion threshold:** add a minimum model-quality score to the gate.
+- [ ] **CI:** add a Docker image build test, and a prediction unit test that doesn't need the real model.
+- [ ] **Monitoring evidence:** simulated drift, and model performance once labels are available.
+- [ ] **Responsible AI:** model card, data card, and privacy, limits, intended-use and fairness statements.
+- [ ] **Performance report:** model metric, business metric, p95 latency, throughput, error rate and drift metric.
+- [ ] **README:** architecture and one-command setup.
+- [ ] **Screenshots:** DVC, MLflow, Airflow, Swagger, GitHub Actions and Grafana.
+- [ ] **Frontend improvements:** a clearer, responsive dashboard for the demo.
+
+### Not being built for now
+
+- **AWS extension:** the rubric lists S3, SageMaker and CloudWatch or equivalent as mandatory. It's your decision to leave this out for now, so the README and viva need to say so. It stays on the list below for after submission.
+
+### Already done
+
+- [x] Git and GitHub, DVC, a fixed random seed and pinned requirements.
+- [x] MLflow parameters, metrics, artifacts and a registered model with a version and alias.
+- [x] FastAPI with input validation, error handling, health and prediction endpoints.
+- [x] Dockerfile, with the image built and tested locally.
+- [x] GitHub Actions passing, with unit and API integration tests.
+- [x] Data drift with Evidently, and SHAP explanations.
+
 ## Key decisions
 
 | Decision | Choice | Status | Affects |
@@ -208,6 +241,7 @@ Phases 4 and 6 can run in parallel once Phase 3 is done. Phase 6 needs Phase 5 o
 
 Only start these once the Nira canal version is in regular use:
 
+- **AWS extension:** S3, SageMaker and CloudWatch or an equivalent, staying within free limits and removing resources afterwards.
 - **Other canals:** automatic UTM zones, cell names from the input boundary, and no fixed map centre or Veer Dam marker.
 - **Canal teams and other users:** views built from the same data, such as area demand and rotation planning.
 - **Crop classifier:** replaces manual crop input once there are enough confirmed crop labels.
@@ -224,7 +258,6 @@ Only start these once the Nira canal version is in regular use:
 
 ## First tasks
 
-1. Add the Google Drive remote and run `dvc push`.
-2. Add a free Carto key.
-3. Arrange the first conversations with farmers.
-4. Start Phase 2 with `configs/settings.yaml`.
+1. Finish [SUBMISSION_PLAN.md](SUBMISSION_PLAN.md).
+2. After submission, resume Phase 2: process new scenes and check the study area.
+3. Arrange the first conversations with farmers, then start Phase 3.
