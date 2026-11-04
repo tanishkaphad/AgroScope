@@ -1,5 +1,6 @@
 """Unit Tests for AgroScope settings and data ingestion, with no network access."""
 
+import json
 from datetime import datetime
 from types import SimpleNamespace
 
@@ -10,9 +11,12 @@ from shapely.geometry import box
 
 from src.config import load_settings, settings
 from src.ingestion import fetch_satellite, fetch_weather
+from src.monitoring.drift import is_drifted, parse_drift_metrics
 from src.preprocessing import cloud_features
 from src.preprocessing.preprocess_bands import compute_spectral_indices, remove_boa_offset
 from src.target.generate_labels import assign_nearest_weather_points, compute_climatic_water_deficit
+from src.training import promote, tracking
+from src.training.promote import decide_promotion
 from src.training.train import FEATURE_COLUMNS
 
 
@@ -177,3 +181,65 @@ def test_weather_request_waits_longer_when_rate_limited(monkeypatch):
     monkeypatch.setattr(fetch_weather.time, "sleep", sleeps.append)
     fetch_weather.request_daily_weather("https://example.test", 18.0, 74.0, {})
     assert sleeps == [settings["weather"]["rate_limit_wait_s"]]
+
+
+def test_promotion_requires_candidate_to_match_champion():
+    assert decide_promotion(0.8, None, 0.0)[0] is True
+    assert decide_promotion(0.8, 0.8, 0.0)[0] is True
+    assert decide_promotion(0.79, 0.8, 0.0)[0] is False
+    assert decide_promotion(0.8, 0.8, 0.01)[0] is False
+
+
+def test_drift_direction_depends_on_test_type():
+    assert is_drifted("Wasserstein distance (normed)", 0.2, 0.1) is True
+    assert is_drifted("Wasserstein distance (normed)", 0.05, 0.1) is False
+    assert is_drifted("K-S p_value", 0.01, 0.05) is True
+    assert is_drifted("K-S p_value", 0.5, 0.05) is False
+
+
+def test_drift_metrics_are_parsed_from_evidently_output():
+    metrics = [
+        {"config": {"type": "evidently:metric_v2:DriftedColumnsCount"}, "value": {"count": 1.0, "share": 0.5}},
+        {"config": {"type": "evidently:metric_v2:ValueDrift", "column": "ndvi_mean", "method": "Wasserstein distance (normed)", "threshold": 0.1}, "value": 0.4},
+        {"config": {"type": "evidently:metric_v2:ValueDrift", "column": "ndwi_mean", "method": "Wasserstein distance (normed)", "threshold": 0.1}, "value": 0.01},
+    ]
+    parsed = parse_drift_metrics(metrics)
+    assert parsed["drifted_share"] == 0.5
+    assert [f["drift"] for f in parsed["features"]] == [True, False]
+
+
+def _log_candidate(tmp_path, name, score):
+    candidate = tmp_path / name
+    candidate.mkdir()
+    for file_name in promote.EXPORTED_FILES:
+        (candidate / file_name).write_text(json.dumps({"model": name}), encoding="utf-8")
+    run_id = tracking.log_training_run({"name": name}, {"temporal_macro_f1": score}, {}, [candidate / "xgboost_model.pkl", candidate / "xgboost_model.json"])
+    (candidate / "feature_metadata.json").write_text(json.dumps({"mlflow_run_id": run_id, "model": name}), encoding="utf-8")
+    tracking.attach_run_artifact(run_id, candidate / "feature_metadata.json")
+    return candidate
+
+
+def test_gate_promotes_better_model_and_keeps_champion_over_worse_one(tmp_path, monkeypatch):
+    artifact_root = (tmp_path / "artifacts").as_uri()
+    monkeypatch.setattr(tracking, "TRACKING_URI", f"sqlite:///{(tmp_path / 'mlflow.db').as_posix()}")
+    monkeypatch.setattr(tracking, "ARTIFACT_ROOT", artifact_root)
+    monkeypatch.setattr(promote, "ARTIFACT_ROOT", artifact_root)
+    production = tmp_path / "production"
+    decision_path = tmp_path / "decision.json"
+
+    def run_gate(name, score):
+        return promote.run_promotion_gate(_log_candidate(tmp_path, name, score), production, decision_path)
+
+    first = run_gate("first", 0.80)
+    assert first["promoted"] is True
+    assert first["active_version"] == 1
+
+    worse = run_gate("worse", 0.70)
+    assert worse["promoted"] is False
+    assert worse["active_version"] == 1
+    assert json.loads((production / "xgboost_model.pkl").read_text(encoding="utf-8"))["model"] == "first"
+
+    better = run_gate("better", 0.90)
+    assert better["promoted"] is True
+    assert better["active_version"] == 3
+    assert json.loads((production / "xgboost_model.pkl").read_text(encoding="utf-8"))["model"] == "better"

@@ -2,7 +2,9 @@
 
 **Goal:** turn AgroScope into a tool people use daily to answer one question: *should I water my farm, when, and how much?* Every forecast gets checked against what the satellite later observes.
 
-**Status:** Phase 1 done. Phase 0 needs only CI's Drive access. Phase 2 is in progress. Last updated 2026-11-04.
+**Status:** Submission priority, with 2 days left from 2026-11-04. Phase 1 done, and the core of Phase 5 built ahead of order. Last updated 2026-11-04.
+
+**Until submission:** finish tests, Docker and the demo. Phases 2, 3, 4 and 6 resume afterwards.
 
 **Git rule:** Claude never runs git operations. The project owner runs them all.
 
@@ -169,16 +171,18 @@ Phases 4 and 6 can run in parallel once Phase 3 is done. Phase 6 needs Phase 5 o
 
 **Goal:** model changes are driven by measured performance.
 
-- [ ] Log every training run to MLflow: data version, code version, parameters and metrics.
-- [ ] Register models with candidate, production and archived stages.
+- [x] Log every training run to MLflow: data version, parameters and metrics. Code version isn't recorded yet.
+- [x] Register every candidate in the MLflow registry, with a `champion` alias for the live model.
 - [ ] Save every forecast with its model version and forecast date.
 - [ ] Score earlier forecasts automatically when a new clear scene arrives.
-- [ ] Add `src/monitoring/` with real Evidently drift reports on live and training data, allowing for normal seasonal change.
-- [ ] Make `/monitoring/drift` return the latest stored report.
-- [ ] Make `/retrain` start a real job, protected by login, and run retraining seasonally or when scores drop.
-- [ ] Promote a new model only if it beats the current one on later data by an agreed margin.
+- [x] Add `src/monitoring/` with real Evidently drift reports on the published date and training data. It can't yet allow for normal seasonal change, because there's only one season of data.
+- [x] Make `/monitoring/drift` return the latest stored report.
+- [x] Make `/retrain` start a real job, protected by an admin token.
+- [ ] Run retraining seasonally or when scores drop.
+- [x] Promote a new model only if it matches or beats the current one on later data.
 - [ ] Add one-step rollback to the previous model.
-- [ ] Add a model health page showing forecast accuracy over time.
+- [x] Add a model status window with scores, the promotion decision and drift results.
+- [ ] Show forecast accuracy over time.
 
 **Done when:** you've run one full cycle on real data: drift or a score drop is detected, a model is retrained, it's promoted or rejected, and rollback has been tested.
 

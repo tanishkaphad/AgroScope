@@ -1,5 +1,6 @@
 """Unit and Integration Tests for AgroScope FastAPI REST API."""
 
+import json
 import random
 
 import pytest
@@ -8,6 +9,7 @@ from api.app.config import settings
 from api.app.main import app
 from api.app.services.geo_service import geo_service
 from api.app.services.model_service import model_service
+from api.app.services.retrain_service import retrain_service
 
 client = TestClient(app)
 
@@ -200,12 +202,41 @@ def test_prediction_unavailable_without_model(monkeypatch):
     assert client.post("/predict", json={}).status_code == 503
 
 
-def test_drift_monitoring_not_implemented():
-    assert client.get("/monitoring/drift").status_code == 501
+def test_drift_summary_is_served_from_its_file(tmp_path, monkeypatch):
+    path = tmp_path / "drift_summary.json"
+    path.write_text(json.dumps({"drift_detected": True, "drifted_share": 0.6}), encoding="utf-8")
+    monkeypatch.setattr(settings, "DRIFT_SUMMARY_JSON", path)
+    assert client.get("/monitoring/drift").json()["drifted_share"] == 0.6
 
 
-def test_retraining_not_implemented():
-    assert client.post("/retrain").status_code == 501
+def test_drift_unavailable_without_report(tmp_path, monkeypatch):
+    monkeypatch.setattr(settings, "DRIFT_SUMMARY_JSON", tmp_path / "missing.json")
+    monkeypatch.setattr(settings, "DRIFT_REPORT_HTML", tmp_path / "missing.html")
+    assert client.get("/monitoring/drift").status_code == 503
+    assert client.get("/monitoring/drift/report").status_code == 503
+
+
+def test_promotion_unavailable_without_decision(tmp_path, monkeypatch):
+    monkeypatch.setattr(settings, "PROMOTION_DECISION_JSON", tmp_path / "missing.json")
+    assert client.get("/monitoring/promotion").status_code == 503
+
+
+def test_retraining_disabled_without_configured_token(monkeypatch):
+    monkeypatch.setattr(settings, "RETRAIN_TOKEN", "")
+    assert client.post("/retrain", headers={"X-Admin-Token": "anything"}).status_code == 503
+
+
+def test_retraining_rejects_wrong_token(monkeypatch):
+    monkeypatch.setattr(settings, "RETRAIN_TOKEN", "correct-token")
+    assert client.post("/retrain", headers={"X-Admin-Token": "wrong"}).status_code == 403
+    assert client.post("/retrain").status_code == 403
+
+
+def test_retraining_starts_with_valid_token(monkeypatch):
+    monkeypatch.setattr(settings, "RETRAIN_TOKEN", "correct-token")
+    monkeypatch.setattr(retrain_service, "start", lambda: True)
+    response = client.post("/retrain", headers={"X-Admin-Token": "correct-token"})
+    assert response.status_code == 202
 
 
 @needs_frontend_build

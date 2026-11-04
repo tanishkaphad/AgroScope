@@ -1,0 +1,14 @@
+*
+!requirements.txt
+!configs/**
+!src/**
+!api/**
+!models/*.pkl
+!models/*.json
+!data/raw/study_area/**
+!data/processed/*.geojson
+!data/processed/*.json
+!data/processed/*.html
+!reports/promotion_decision.json
+!frontend/dist/**
+**/__pycache__

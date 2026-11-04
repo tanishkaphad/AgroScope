@@ -163,15 +163,23 @@ stages:
       hash: md5
       md5: f3ca1a5c428b072b7c9a5849020bbddc
       size: 545
+    - path: src/training/tracking.py
+      hash: md5
+      md5: 635b0bd7d47aacf3bdd26e49bfb27ae3
+      size: 2223
     - path: src/training/train.py
       hash: md5
-      md5: 8a649d87232593e03aeecce9032a7f96
-      size: 17746
+      md5: c4d88328f86429623b7422983e87606f
+      size: 19790
     params:
       configs/settings.yaml:
         training:
           target_column: target_stress_class
           temporal_split_date: '2024-02-01'
+          label_input_features:
+          - ndwi_mean
+          - rainfall_8day
+          - et0_8day_sum
           spatial_test_size: 0.25
           random_state: 42
           features:
@@ -210,19 +218,19 @@ stages:
             subsample: 0.8
             colsample_bytree: 0.8
     outs:
-    - path: models/baseline_random_forest.pkl
+    - path: models/candidate/baseline_random_forest.pkl
       hash: md5
       md5: e24379d6417c41787f9b79111595275a
       size: 25731242
-    - path: models/feature_metadata.json
+    - path: models/candidate/feature_metadata.json
       hash: md5
-      md5: 2e59af990b995a5953698f8e2a825d3f
-      size: 4730
-    - path: models/xgboost_model.json
+      md5: 5f4e20837c3a70cbaf66429d34658cb9
+      size: 8248
+    - path: models/candidate/xgboost_model.json
       hash: md5
       md5: 4d0a663eb00581894f76830e729bfe2d
       size: 2636644
-    - path: models/xgboost_model.pkl
+    - path: models/candidate/xgboost_model.pkl
       hash: md5
       md5: 4ba0790b6da96c4f93dd5c8a616c71e4
       size: 1743158
@@ -239,8 +247,8 @@ stages:
       size: 18635716
     - path: models/feature_metadata.json
       hash: md5
-      md5: 2e59af990b995a5953698f8e2a825d3f
-      size: 4730
+      md5: 5f4e20837c3a70cbaf66429d34658cb9
+      size: 8248
     - path: models/xgboost_model.pkl
       hash: md5
       md5: 4ba0790b6da96c4f93dd5c8a616c71e4
@@ -280,3 +288,113 @@ stages:
       hash: md5
       md5: 5cd377301e76568bbb1e3a45b19d0ba5
       size: 8541110
+  promote_model:
+    cmd: python src/training/promote.py
+    deps:
+    - path: models/candidate/feature_metadata.json
+      hash: md5
+      md5: 5f4e20837c3a70cbaf66429d34658cb9
+      size: 8248
+    - path: models/candidate/xgboost_model.pkl
+      hash: md5
+      md5: 4ba0790b6da96c4f93dd5c8a616c71e4
+      size: 1743158
+    - path: src/config.py
+      hash: md5
+      md5: f3ca1a5c428b072b7c9a5849020bbddc
+      size: 545
+    - path: src/training/promote.py
+      hash: md5
+      md5: 8ece433609fae211fc9410a7691af398
+      size: 5023
+    - path: src/training/tracking.py
+      hash: md5
+      md5: 635b0bd7d47aacf3bdd26e49bfb27ae3
+      size: 2223
+    params:
+      configs/settings.yaml:
+        promotion:
+          metric: temporal_macro_f1
+          min_improvement: 0.0
+        tracking:
+          database: mlflow.db
+          artifact_dir: mlruns
+          experiment: agroscope-water-stress
+          registered_model: agroscope-stress-classifier
+    outs:
+    - path: models/feature_metadata.json
+      hash: md5
+      md5: 5f4e20837c3a70cbaf66429d34658cb9
+      size: 8248
+    - path: models/xgboost_model.json
+      hash: md5
+      md5: 4d0a663eb00581894f76830e729bfe2d
+      size: 2636644
+    - path: models/xgboost_model.pkl
+      hash: md5
+      md5: 4ba0790b6da96c4f93dd5c8a616c71e4
+      size: 1743158
+    - path: reports/promotion_decision.json
+      hash: md5
+      md5: 3f17d5d0fcbfe1d3c7996eec7113e4b1
+      size: 327
+  monitor_drift:
+    cmd: python src/monitoring/drift.py
+    deps:
+    - path: data/features/features.csv
+      hash: md5
+      md5: b748fefb34c9d8c21f42ea57314fb167
+      size: 168385058
+    - path: data/processed/cycle_statistics.json
+      hash: md5
+      md5: 535da02a15a819f6ae0f7308ea5ff0b8
+      size: 740
+    - path: src/config.py
+      hash: md5
+      md5: f3ca1a5c428b072b7c9a5849020bbddc
+      size: 545
+    - path: src/monitoring/drift.py
+      hash: md5
+      md5: 481f331ad66fea7661a5556f13deb150
+      size: 4941
+    params:
+      configs/settings.yaml:
+        monitoring:
+          sample_rows: 20000
+          drift_share_alert: 0.5
+        training.features:
+        - ndvi_mean
+        - ndvi_std
+        - ndwi_mean
+        - ndwi_std
+        - evi_mean
+        - evi_std
+        - b02_mean
+        - b03_mean
+        - b04_mean
+        - b08_mean
+        - b11_mean
+        - b12_mean
+        - temp_mean_c
+        - temp_max_c
+        - humidity_pct
+        - wind_speed_mps
+        - solar_radiation_mj
+        - rainfall_8day
+        - rainfall_16day
+        - rainfall_30day
+        - temp_8day_mean
+        - temp_30day_mean
+        - temp_8day_max
+        - et0_8day_sum
+        - et0_16day_sum
+        training.temporal_split_date: '2024-02-01'
+    outs:
+    - path: data/processed/drift_report.html
+      hash: md5
+      md5: f53d60856c771f1e91122ad10526d8c5
+      size: 5285766
+    - path: data/processed/drift_summary.json
+      hash: md5
+      md5: 64667f427ae68ac53849a02ed5679796
+      size: 4600

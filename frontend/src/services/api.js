@@ -24,6 +24,16 @@ export function fetchMetrics() {
   return request('/metrics');
 }
 
+export function fetchDriftReport() {
+  return request('/monitoring/drift');
+}
+
+export function fetchPromotionDecision() {
+  return request('/monitoring/promotion');
+}
+
+export const driftReportUrl = `${API_BASE}/monitoring/drift/report`;
+
 export function fetchAvailableDates() {
   return request('/available-dates');
 }

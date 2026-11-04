@@ -30,6 +30,7 @@ COPY api/ ./api/
 COPY models/ ./models/
 COPY data/raw/study_area/ ./data/raw/study_area/
 COPY data/processed/ ./data/processed/
+COPY reports/ ./reports/
 COPY frontend/dist/ ./frontend/dist/
 
 EXPOSE 8000

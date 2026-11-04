@@ -74,6 +74,8 @@ labels:
 training:
   target_column: target_stress_class
   temporal_split_date: "2024-02-01"
+  # Inputs the formula-based labels are calculated from, used for the leakage check
+  label_input_features: [ndwi_mean, rainfall_8day, et0_8day_sum]
   spatial_test_size: 0.25
   random_state: 42
   features:
@@ -114,3 +116,17 @@ training:
 
 inference:
   min_latest_coverage: 0.9
+
+tracking:
+  database: mlflow.db
+  artifact_dir: mlruns
+  experiment: agroscope-water-stress
+  registered_model: agroscope-stress-classifier
+
+promotion:
+  metric: temporal_macro_f1
+  min_improvement: 0.0
+
+monitoring:
+  sample_rows: 20000
+  drift_share_alert: 0.5

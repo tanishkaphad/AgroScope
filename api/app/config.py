@@ -33,6 +33,9 @@ class Settings:
     CYCLE_STATS_JSON: Path = DATA_DIR / "processed" / "cycle_statistics.json"
     MODEL_PATH: Path = MODELS_DIR / "xgboost_model.pkl"
     METADATA_PATH: Path = MODELS_DIR / "feature_metadata.json"
+    DRIFT_SUMMARY_JSON: Path = DATA_DIR / "processed" / "drift_summary.json"
+    DRIFT_REPORT_HTML: Path = DATA_DIR / "processed" / "drift_report.html"
+    PROMOTION_DECISION_JSON: Path = REPORTS_DIR / "promotion_decision.json"
     
     # CORS
     CORS_ORIGINS: List[str] = [
@@ -49,6 +52,9 @@ class Settings:
     # Supabase credentials (optional)
     SUPABASE_URL: str = os.getenv("SUPABASE_URL", "")
     SUPABASE_KEY: str = os.getenv("SUPABASE_KEY", "")
+
+    # Admin token for starting retraining. Retraining is disabled when it's empty.
+    RETRAIN_TOKEN: str = os.getenv("RETRAIN_TOKEN", "")
 
 
 settings = Settings()

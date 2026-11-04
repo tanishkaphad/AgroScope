@@ -37,7 +37,7 @@ async def get_system_metrics():
         uptime_seconds=sys_stats["uptime_seconds"],
         total_inferences=sys_stats["total_inferences"],
         active_model=model_service.get_version(),
-        macro_f1_score=model_service.get_macro_f1(),
+        **model_service.get_scores(),
         score_note="Measured against formula-based labels, not field observations.",
         memory_rss_mb=sys_stats["memory_rss_mb"],
         timestamp=datetime.now(timezone.utc).isoformat(),

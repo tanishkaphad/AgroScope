@@ -7,3 +7,7 @@ httpx==0.28.1
 # Data & Pipeline Versioning
 dvc==3.67.1
 dvc-gdrive==3.0.1
+
+# Experiment Tracking & Drift Monitoring
+mlflow==3.18.0
+evidently==0.7.23

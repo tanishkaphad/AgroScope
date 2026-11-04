@@ -19,6 +19,8 @@ class MetricsResponse(BaseModel):
     total_inferences: int
     active_model: Optional[str] = None
     macro_f1_score: Optional[float] = None
+    temporal_macro_f1: Optional[float] = None
+    temporal_macro_f1_without_label_inputs: Optional[float] = None
     score_note: str
     memory_rss_mb: float
     timestamp: str

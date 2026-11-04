@@ -6,7 +6,7 @@ export default function KpiBar({ stats, currentLang = 'en' }) {
 
   const labels = {
     en: {
-      totalArea: 'Cultivated Command Area',
+      totalArea: 'Vegetated Area',
       highStress: 'High Water Stress',
       modStress: 'Moderate Stress',
       priority1: 'Priority 1 (Urgent 24-48h)',
@@ -17,7 +17,7 @@ export default function KpiBar({ stats, currentLang = 'en' }) {
       statusUrgent: 'Canal Scheduling Required',
     },
     mr: {
-      totalArea: 'एकूण पेरणी क्षेत्र',
+      totalArea: 'एकूण वनस्पती क्षेत्र',
       highStress: 'तीव्र पाण्याचा ताण',
       modStress: 'मध्यम पाण्याचा ताण',
       priority1: 'तातडीचे सिंचन (२४-४८ तास)',
@@ -28,7 +28,7 @@ export default function KpiBar({ stats, currentLang = 'en' }) {
       statusUrgent: 'कालवा पाळीची गरज',
     },
     hi: {
-      totalArea: 'कुल सिंचित फसल क्षेत्र',
+      totalArea: 'कुल वनस्पति क्षेत्र',
       highStress: 'गंभीर जल तनाव',
       modStress: 'मध्यम जल तनाव',
       priority1: 'प्राथमिकता १ (तुरंत सिंचाई २४-४८ घंटे)',

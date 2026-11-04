@@ -45,6 +45,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.config import settings
+from src.training.tracking import attach_run_artifact, file_md5, log_training_run
 
 logging.basicConfig(
     level=logging.INFO,
@@ -267,7 +268,7 @@ def run_training_pipeline(
     if features_csv is None:
         features_csv = base_dir / "data" / "features" / "features.csv"
     if output_dir is None:
-        output_dir = base_dir / "models"
+        output_dir = base_dir / "models" / "candidate"
 
     output_dir.mkdir(parents=True, exist_ok=True)
     reports_dir = base_dir / "reports"
@@ -286,6 +287,19 @@ def run_training_pipeline(
     # 2. Train Main XGBoost Classifier
     xgb_model = train_xgboost_classifier(X_train, y_train)
     xgb_eval = evaluate_model(xgb_model, X_test, y_test, model_name="XGBoost Classifier")
+
+    # 2b. Date-based check: train on earlier dates and test on later ones
+    X_past, X_future, y_past, y_future, _, temporal_desc = prepare_datasets(features_csv=features_csv, strategy="temporal")
+    temporal_eval = evaluate_model(train_xgboost_classifier(X_past, y_past), X_future, y_future, model_name="XGBoost Date-Based Check")
+
+    # 2c. Leakage check: the same test without the inputs the labels are calculated from
+    label_inputs = TRAINING["label_input_features"]
+    temporal_no_label_inputs_eval = evaluate_model(
+        train_xgboost_classifier(X_past.drop(columns=label_inputs), y_past),
+        X_future.drop(columns=label_inputs),
+        y_future,
+        model_name="XGBoost Date-Based Check Without Label Inputs",
+    )
 
     # 3. Extract Feature Importances from XGBoost
     importances = xgb_model.feature_importances_
@@ -316,9 +330,34 @@ def run_training_pipeline(
             "xgboost": xgb_eval,
         },
         "top_features": feat_imp[:10],
+        "temporal_validation": temporal_desc,
+        "temporal_metrics": {
+            "xgboost": temporal_eval,
+            "xgboost_without_label_inputs": temporal_no_label_inputs_eval,
+        },
     }
     with open(meta_path, "w", encoding="utf-8") as f:
         json.dump(metadata, f, indent=2)
+
+    # 4b. Record the run in MLflow, with the metadata file naming its own run
+    tracking_metrics = {
+        "spatial_accuracy": xgb_eval["accuracy"],
+        "spatial_macro_f1": xgb_eval["macro_f1"],
+        "temporal_accuracy": temporal_eval["accuracy"],
+        "temporal_macro_f1": temporal_eval["macro_f1"],
+        "temporal_macro_f1_without_label_inputs": temporal_no_label_inputs_eval["macro_f1"],
+        "baseline_rf_spatial_macro_f1": rf_eval["macro_f1"],
+    }
+    run_id = log_training_run(
+        params={**TRAINING["xgboost"], "feature_count": len(feature_names), "train_rows": len(X_train), "temporal_split_date": SPLIT_DATE_THRESHOLD},
+        metrics=tracking_metrics,
+        tags={"data_md5": file_md5(features_csv), "validation": split_desc},
+        artifact_paths=[xgb_pkl_path, xgb_json_path],
+    )
+    metadata["mlflow_run_id"] = run_id
+    with open(meta_path, "w", encoding="utf-8") as f:
+        json.dump(metadata, f, indent=2)
+    attach_run_artifact(run_id, meta_path)
 
     # 5. Generate Model Evaluation Report
     report_file = reports_dir / "model_evaluation_report.md"

@@ -37,6 +37,7 @@ htmlcov/
 # MLOps & MLflow
 mlruns/
 .mlflow/
+mlflow.db
 
 # DVC local storage & cache
 .dvc/cache

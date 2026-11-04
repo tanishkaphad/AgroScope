@@ -92,6 +92,10 @@ class GeoService:
             except Exception as exc:
                 logger.error("Failed to load irrigation map GeoJSON: %s", exc)
 
+    def reload(self) -> None:
+        """Replace cached results with the latest files."""
+        self.__init__()
+
     def get_study_area(self) -> Optional[Dict[str, Any]]:
         return self.study_area
 

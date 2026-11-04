@@ -24,6 +24,7 @@ class ModelService:
 
     def __init__(self) -> None:
         self.predictor: Optional[AgroScopePredictor] = None
+        self.version: Optional[str] = None
         self.total_inferences: int = 0
         self.start_time: float = time.time()
         self._load_predictor()
@@ -41,6 +42,8 @@ class ModelService:
                 model_path=settings.MODEL_PATH,
                 metadata_path=settings.METADATA_PATH,
             )
+            digest = hashlib.md5(settings.MODEL_PATH.read_bytes()).hexdigest()
+            self.version = f"xgboost-{digest[:8]}"
             logger.info("AgroScopePredictor initialized successfully.")
         except Exception as exc:
             logger.error("Failed to load AgroScopePredictor: %s", exc)
@@ -59,18 +62,20 @@ class ModelService:
 
     def get_version(self) -> Optional[str]:
         """Identify the loaded model by a hash of its file."""
-        if not self.is_loaded():
-            return None
-        digest = hashlib.md5(settings.MODEL_PATH.read_bytes()).hexdigest()
-        return f"xgboost-{digest[:8]}"
+        return self.version if self.is_loaded() else None
 
-    def get_macro_f1(self) -> Optional[float]:
-        """Read the macro F1 recorded for the model at training time."""
+    def get_scores(self) -> Dict[str, Optional[float]]:
+        """Read the scores recorded for the model at training time."""
         if not settings.METADATA_PATH.exists():
-            return None
+            return {}
         with open(settings.METADATA_PATH, "r", encoding="utf-8") as f:
             metadata = json.load(f)
-        return metadata.get("metrics", {}).get("xgboost", {}).get("macro_f1")
+        temporal = metadata.get("temporal_metrics", {})
+        return {
+            "macro_f1_score": metadata.get("metrics", {}).get("xgboost", {}).get("macro_f1"),
+            "temporal_macro_f1": temporal.get("xgboost", {}).get("macro_f1"),
+            "temporal_macro_f1_without_label_inputs": temporal.get("xgboost_without_label_inputs", {}).get("macro_f1"),
+        }
 
 
 model_service = ModelService.get_instance()
