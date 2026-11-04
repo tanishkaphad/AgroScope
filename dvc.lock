@@ -246,12 +246,12 @@ stages:
     outs:
     - path: models/candidate/feature_metadata.json
       hash: md5
-      md5: c70bc59cd655e72660926cc54969fb32
+      md5: 5fae8f3264a51b3edea153c7ec43063c
       size: 15981
     - path: models/candidate/model.pkl
       hash: md5
-      md5: ac395666f8879804176eb61304f5ad31
-      size: 1579382
+      md5: 61ddac5fc766af3696461e10fdfc1a2d
+      size: 1579385
   predict_cycle:
     cmd: python src/inference/predict.py
     deps:
@@ -265,28 +265,32 @@ stages:
       size: 17822622
     - path: models/feature_metadata.json
       hash: md5
-      md5: c70bc59cd655e72660926cc54969fb32
+      md5: 5fae8f3264a51b3edea153c7ec43063c
       size: 15981
     - path: models/model.pkl
       hash: md5
-      md5: ac395666f8879804176eb61304f5ad31
-      size: 1579382
+      md5: 61ddac5fc766af3696461e10fdfc1a2d
+      size: 1579385
     - path: src/advisory/advisory_engine.py
       hash: md5
       md5: 58ab0c08f541aad5f766d24cbcb07d87
       size: 16632
+      isexec: true
     - path: src/config.py
       hash: md5
       md5: f3ca1a5c428b072b7c9a5849020bbddc
       size: 545
+      isexec: true
     - path: src/inference/explainability.py
       hash: md5
       md5: 6d6bf08c2cc46ec146574e0966fe7a5a
       size: 10727
+      isexec: true
     - path: src/inference/predict.py
       hash: md5
       md5: 5b1470a49f64c5d6dd9d2b4feaecc2b5
       size: 22373
+      isexec: true
     params:
       configs/settings.yaml:
         aoi.cell_area_ha: 6.25
@@ -296,8 +300,8 @@ stages:
     outs:
     - path: data/processed/cycle_statistics.json
       hash: md5
-      md5: fd1b763df54c86f9ce686068a72d25c8
-      size: 740
+      md5: 8d1e67a0686da31dbdb22029573e97ca
+      size: 714
     - path: data/processed/irrigation_map.geojson
       hash: md5
       md5: 6455e22bbc62e02697efa7c2cc4748e0
@@ -311,12 +315,12 @@ stages:
     deps:
     - path: models/candidate/feature_metadata.json
       hash: md5
-      md5: c70bc59cd655e72660926cc54969fb32
+      md5: 5fae8f3264a51b3edea153c7ec43063c
       size: 15981
     - path: models/candidate/model.pkl
       hash: md5
-      md5: ac395666f8879804176eb61304f5ad31
-      size: 1579382
+      md5: 61ddac5fc766af3696461e10fdfc1a2d
+      size: 1579385
     - path: reports/evaluation_result.json
       hash: md5
       md5: a0a3fe59b1b47812e1e7d32a96258c1a
@@ -350,16 +354,16 @@ stages:
     outs:
     - path: models/feature_metadata.json
       hash: md5
-      md5: c70bc59cd655e72660926cc54969fb32
+      md5: 5fae8f3264a51b3edea153c7ec43063c
       size: 15981
     - path: models/model.pkl
       hash: md5
-      md5: ac395666f8879804176eb61304f5ad31
-      size: 1579382
+      md5: 61ddac5fc766af3696461e10fdfc1a2d
+      size: 1579385
     - path: reports/promotion_decision.json
       hash: md5
-      md5: f4ef5dbf3feb100c98ed1bfb50354bd2
-      size: 352
+      md5: ec96a393337dd6497ced1f4dcf8fbce2
+      size: 371
   monitor_drift:
     cmd: python src/monitoring/drift.py
     deps:
@@ -369,24 +373,28 @@ stages:
       size: 167818738
     - path: data/processed/cycle_results.csv
       hash: md5
-      md5: f1309b5a19beeccd1b2a7bfcf4394a39
-      size: 36065423
+      md5: 7e2c1227d3e2450261881974bf72d006
+      size: 35525570
+      isexec: true
     - path: data/processed/cycle_statistics.json
       hash: md5
-      md5: fd1b763df54c86f9ce686068a72d25c8
-      size: 740
+      md5: 8d1e67a0686da31dbdb22029573e97ca
+      size: 714
     - path: data/processed/cycle_statistics_by_date.json
       hash: md5
-      md5: 68ccd4a89f592fa2193241a8e46e9cac
-      size: 22094
+      md5: f895dde46fa3c64f734d0bf4d53d9bae
+      size: 21364
+      isexec: true
     - path: src/config.py
       hash: md5
       md5: f3ca1a5c428b072b7c9a5849020bbddc
       size: 545
+      isexec: true
     - path: src/monitoring/drift.py
       hash: md5
       md5: c4facb559bb4305adc87680f558080af
       size: 4984
+      isexec: true
     params:
       configs/settings.yaml:
         monitoring:
@@ -422,12 +430,12 @@ stages:
     outs:
     - path: data/processed/drift_report.html
       hash: md5
-      md5: 6727f6e9ccf3a84b84b241206c17dcb1
-      size: 5285766
+      md5: e08a3eab865ad2adadf0918e2c8147b7
+      size: 5284906
     - path: data/processed/drift_summary.json
       hash: md5
-      md5: 8585dc8c50b7146d9f081e61b907ea9b
-      size: 4600
+      md5: 85fcdda5ed3e869bddf878dabdc56ca6
+      size: 4412
   validate_raw:
     cmd: python src/validation/validate_data.py --stage raw
     deps:
@@ -663,7 +671,7 @@ stages:
     deps:
     - path: models/candidate/feature_metadata.json
       hash: md5
-      md5: c70bc59cd655e72660926cc54969fb32
+      md5: 5fae8f3264a51b3edea153c7ec43063c
       size: 15981
     - path: src/config.py
       hash: md5

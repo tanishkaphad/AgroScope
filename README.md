@@ -89,13 +89,79 @@ docker compose up --build
 | Grafana | http://localhost:3000 | None to view |
 | Prometheus | http://localhost:9090 | None |
 
-**3. Run the pipeline.** In Airflow, start the `agroscope_pipeline` DAG. MLflow's data lives in a Docker volume, so a new machine starts with an empty registry until this runs. Then load the new results:
+The dashboard's tools bar links to all of these.
+
+**3. Run the pipeline.** Follow [the steps below](#run-the-whole-pipeline-step-by-step). MLflow's data lives in a Docker volume, so a new machine starts with an empty registry until this runs.
+
+`docker compose down -v` deletes MLflow's runs and registry, so leave off `-v` unless you mean to.
+
+## Run the whole pipeline step by step
+
+Use this to show the pipeline running from start to finish. It takes about 9 minutes. Every tool is linked from the bar at the top of the dashboard.
+
+**Why there's a Force rerun option:** each task is a DVC stage, and DVC skips any stage whose inputs haven't changed. A normal run on unchanged data finishes in about 90 seconds with every stage skipped. Force rerun makes every stage run again, except the weather download.
+
+**1. Start the system.** From the project root:
+
+```bash
+docker compose up -d
+```
+```bash
+docker compose ps
+```
+
+Wait until `api` and `mlflow` show `healthy`, then open http://localhost:8000/dashboard/.
+
+**2. Open Airflow.** Click **Airflow** in the dashboard's tools bar, and sign in with `admin` / `admin`. Click `agroscope_pipeline`, then **Grid** if it isn't already showing.
+
+**3. Start the run.** Click the play button (▶) at the top right, which opens the trigger form:
+
+- Turn on **Force rerun**.
+- Leave **Refetch weather** off. It needs internet, and new weather values would change every result.
+- Click **Trigger**, at the bottom of the form.
+
+![Airflow's trigger form](docs/screenshots/airflow_force_rerun_form.jpg)
+
+**4. Watch the tasks.** Turn on **Auto-refresh** in the Grid view. Each square turns green as its task finishes. Click a task, then **Logs**, to see its output.
+
+| # | Task | What it does | Time in the last full run |
+| :--- | :--- | :--- | :--- |
+| 1 | `ingestion` | Checks the weather data is current | 2 sec |
+| 2 | `raw_data_validation` | Checks raw weather and the scene list | 9 sec |
+| 3 | `preprocessing` | Builds the grid and per-cell satellite values | 1 min 51 sec |
+| 4 | `feature_engineering` | Joins the data and calculates labels | 1 min 24 sec |
+| 5 | `feature_validation` | Checks the training table | 8 sec |
+| 6 | `training` | Trains 3 models, each with 3 tests | 2 min 21 sec |
+| 7 | `evaluation` | Records whether the score passes 0.85 | 2 sec |
+| 8 | `model_registration` | Applies the gate and exports the champion | 10 sec |
+| 9 | `batch_prediction` | Builds maps and statistics for all 27 dates | 42 sec |
+| 10 | `drift_monitoring` | Compares the published date with the training period | 22 sec |
+
+Airflow waits a few seconds between tasks, so the whole run took about 9 minutes 20 seconds.
+
+**5. Check the new runs.** Click **MLflow** in the tools bar and open `agroscope-water-stress`. Three new runs appear during `training`: `random_forest`, `xgboost` and `lightgbm`.
+
+**6. Check the release decision.** In MLflow, open **Models**, then `agroscope-stress-classifier`. A new version appears after `model_registration`, with the gate's decision in its tags. On unchanged data the scores tie, and a tie is promoted, so the `champion` alias moves to the new version.
+
+**7. Load the new results.** The API reads its model and results when it starts:
 
 ```bash
 docker compose restart api
 ```
 
-`docker compose down -v` deletes MLflow's runs and registry, so leave off `-v` unless you mean to.
+Wait about 30 seconds, then refresh the dashboard. **Model Status** shows the new version number and promotion decision.
+
+**8. Confirm it's complete.** With the environment active:
+
+```bash
+.venv/Scripts/dvc status
+```
+
+It should say `Data and pipelines are up to date`.
+
+**If a task fails,** its square turns red and the tasks after it don't run. Click it, then **Logs**, to see why. A failed validation stops the run on purpose, before training.
+
+**After a live run,** `dvc.lock` changes because the model files have new hashes. Scores and results stay the same. To keep the run, use `dvc push`, then commit `dvc.lock`.
 
 ## Results
 
@@ -111,9 +177,9 @@ Macro F1 from the latest run. **These are measured against labels calculated by 
 
 | Measure | Result |
 | :--- | :--- |
-| p95 latency | 150.5 ms |
-| Throughput | 170.79 requests per second |
-| Error rate | 0% of 10,257 requests |
+| p95 latency | 168.9 ms |
+| Throughput | 146.99 requests per second |
+| Error rate | 0% of 8,833 requests |
 | Inputs drifted on the published date | 100% |
 | Simulated drift, unchanged control | 0% |
 | Simulated drift, after shifting 9 inputs | 36%, with all 9 flagged and no others |

@@ -8,14 +8,14 @@ Built by `scripts/build_performance_report.py` from saved results. No number her
 | :--- | :--- | :--- |
 | Model: macro F1 on later dates | 0.9242 | `reports/evaluation_result.json` |
 | Business: hectares flagged Priority 1 this cycle | 117,243.8 ha (97.2%) | `data/processed/cycle_statistics.json` |
-| p95 latency, all requests | 150.5 ms | `reports/load_test_results.json` |
-| Throughput | 170.79 requests per second | `reports/load_test_results.json` |
+| p95 latency, all requests | 168.9 ms | `reports/load_test_results.json` |
+| Throughput | 146.99 requests per second | `reports/load_test_results.json` |
 | Error rate | 0.00% | `reports/load_test_results.json` |
 | Drift: share of inputs drifted on the published date | 100% | `data/processed/drift_summary.json` |
 
 ## Model performance
 
-The promotion gate uses `temporal_macro_f1`, with a minimum of 0.85. Latest decision: promoted, lightgbm version 1. No champion exists yet.
+The promotion gate uses `temporal_macro_f1`, with a minimum of 0.85. Latest decision: promoted, lightgbm version 2. Candidate 0.9242 meets the required 0.9242.
 
 | Model | Unseen cells | Later dates | Later dates without label inputs |
 | :--- | :--- | :--- | :--- |
@@ -72,17 +72,17 @@ The largest macro F1 gap between reaches is 0.0124.
 
 ## Serving performance
 
-10 simulated users for 60.1 seconds against `http://localhost:8000`, model `lightgbm-ac395666`, measured 2026-11-04T12:01:24.947417+00:00. Run on one local computer, with the client and API sharing its resources.
+10 simulated users for 60.1 seconds against `http://localhost:8000`, model `lightgbm-61ddac5f`, measured 2026-11-04T17:13:55.918956+00:00. Run on one local computer, with the client and API sharing its resources.
 
 | Request | Requests | Errors | Throughput (per second) | p50 ms | p95 ms | p99 ms |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| All | 10257 | 0 | 170.79 | 39.7 | 150.5 | 187.4 |
-| statistics | 3129 | 0 | 52.1 | 26.2 | 59.4 | 80.9 |
-| cell_details | 3033 | 0 | 50.5 | 27.0 | 59.6 | 79.8 |
-| predict | 3023 | 0 | 50.34 | 118.1 | 176.7 | 211.8 |
-| map_sample | 1072 | 0 | 17.85 | 47.1 | 82.8 | 106.5 |
+| All | 8833 | 0 | 146.99 | 47.9 | 168.9 | 200.9 |
+| statistics | 2671 | 0 | 44.45 | 32.5 | 68.7 | 87.3 |
+| cell_details | 2616 | 0 | 43.53 | 31.9 | 68.9 | 87.6 |
+| predict | 2636 | 0 | 43.87 | 133.5 | 194.2 | 224.1 |
+| map_sample | 910 | 0 | 15.14 | 57.2 | 95.9 | 112.2 |
 
-`/predict` includes a SHAP explanation for each request. Its p95 was 176.7 ms.
+`/predict` includes a SHAP explanation for each request. Its p95 was 194.2 ms.
 
 ## Drift
 

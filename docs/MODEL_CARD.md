@@ -1,6 +1,6 @@
 # AgroScope Model Card
 
-**Model:** `agroscope-stress-classifier`, version 1, a LightGBM classifier. It was released through the promotion gate on 2026-11-04.
+**Model:** `agroscope-stress-classifier`, version 2, a LightGBM classifier. It was released through the promotion gate on 2026-11-04.
 
 ## Purpose
 

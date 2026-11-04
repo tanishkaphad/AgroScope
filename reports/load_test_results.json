@@ -1,69 +1,69 @@
 {
-  "measured_at": "2026-11-04T12:01:24.947417+00:00",
+  "measured_at": "2026-11-04T17:13:55.918956+00:00",
   "base_url": "http://localhost:8000",
-  "model_version": "lightgbm-ac395666",
+  "model_version": "lightgbm-61ddac5f",
   "users": 10,
   "duration_s": 60.1,
   "note": "Run on one local computer, with the client and API sharing its resources.",
   "overall": {
-    "requests": 10257,
+    "requests": 8833,
     "errors": 0,
     "error_rate": 0.0,
-    "throughput_rps": 170.79,
+    "throughput_rps": 146.99,
     "latency_ms": {
-      "p50": 39.7,
-      "p95": 150.5,
-      "p99": 187.4,
-      "max": 423.1
+      "p50": 47.9,
+      "p95": 168.9,
+      "p99": 200.9,
+      "max": 638.1
     }
   },
   "by_request": {
     "statistics": {
-      "requests": 3129,
+      "requests": 2671,
       "errors": 0,
       "error_rate": 0.0,
-      "throughput_rps": 52.1,
+      "throughput_rps": 44.45,
       "latency_ms": {
-        "p50": 26.2,
-        "p95": 59.4,
-        "p99": 80.9,
-        "max": 345.2
+        "p50": 32.5,
+        "p95": 68.7,
+        "p99": 87.3,
+        "max": 499.2
       }
     },
     "cell_details": {
-      "requests": 3033,
+      "requests": 2616,
       "errors": 0,
       "error_rate": 0.0,
-      "throughput_rps": 50.5,
+      "throughput_rps": 43.53,
       "latency_ms": {
-        "p50": 27.0,
-        "p95": 59.6,
-        "p99": 79.8,
-        "max": 343.4
+        "p50": 31.9,
+        "p95": 68.9,
+        "p99": 87.6,
+        "max": 498.6
       }
     },
     "predict": {
-      "requests": 3023,
+      "requests": 2636,
       "errors": 0,
       "error_rate": 0.0,
-      "throughput_rps": 50.34,
+      "throughput_rps": 43.87,
       "latency_ms": {
-        "p50": 118.1,
-        "p95": 176.7,
-        "p99": 211.8,
-        "max": 423.1
+        "p50": 133.5,
+        "p95": 194.2,
+        "p99": 224.1,
+        "max": 638.1
       }
     },
     "map_sample": {
-      "requests": 1072,
+      "requests": 910,
       "errors": 0,
       "error_rate": 0.0,
-      "throughput_rps": 17.85,
+      "throughput_rps": 15.14,
       "latency_ms": {
-        "p50": 47.1,
-        "p95": 82.8,
-        "p99": 106.5,
-        "max": 345.3
+        "p50": 57.2,
+        "p95": 95.9,
+        "p99": 112.2,
+        "max": 490.5
       }
     }
   }

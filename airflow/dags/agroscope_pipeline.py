@@ -3,6 +3,10 @@
 Each task runs one DVC stage, so DVC skips any step whose inputs haven't changed and raw data
 isn't reprocessed needlessly. `dvc.yaml` remains the single definition of what each step does.
 A failed validation stops every task after it.
+
+To show a real run when nothing has changed, trigger with `force_rerun` on. That reruns every
+stage except the weather download, which needs `refetch_weather` as well, because new weather
+values would change every result.
 """
 
 from __future__ import annotations
@@ -10,10 +14,12 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 
 from airflow import DAG
+from airflow.models.param import Param
 from airflow.operators.bash import BashOperator
 
 PROJECT_DIR = "/opt/agroscope"
 PIPELINE_BIN = "/opt/pipeline-venv/bin"
+WEATHER_STAGE = "acquire_weather"
 
 # (task id, DVC stage, what the task does), in the order they run
 STEPS = [
@@ -38,12 +44,19 @@ with DAG(
     max_active_runs=1,
     default_args={"retries": 0, "execution_timeout": timedelta(hours=2)},
     tags=["agroscope", "mlops"],
+    params={
+        "force_rerun": Param(False, type="boolean", title="Force rerun", description="Rerun every stage, even if nothing changed. Takes about 9 minutes."),
+        "refetch_weather": Param(False, type="boolean", title="Refetch weather", description="Also download weather again. Needs internet, and new values would change every result."),
+    },
     doc_md=__doc__,
 ) as dag:
     tasks = [
         BashOperator(
             task_id=task_id,
-            bash_command=f"dvc repro --single-item {stage}",
+            bash_command=(
+                "dvc repro {{ '--force' if params." + ("refetch_weather" if stage == WEATHER_STAGE else "force_rerun") + " else '' }} "
+                f"--single-item {stage}"
+            ),
             cwd=PROJECT_DIR,
             # DVC runs each stage's `python` from this PATH.
             env={"PATH": f"{PIPELINE_BIN}:/usr/local/bin:/usr/bin:/bin"},

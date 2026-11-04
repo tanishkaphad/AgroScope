@@ -1,5 +1,6 @@
 import React from 'react';
-import { Activity } from 'lucide-react';
+import { Activity, ExternalLink } from 'lucide-react';
+import { DASHBOARD_LINKS } from '../services/api';
 
 const LANGUAGES = [
   { code: 'en', label: 'EN' },
@@ -56,6 +57,17 @@ export default function Header({ t, currentLang, onLangChange, onOpenMlops, syst
           <span>{t[STATUS_TEXT[systemStatus]]}</span>
         </div>
       </div>
+
+      <nav className="tools-bar" id="tools-bar" aria-label={t.tools}>
+        <span className="tools-label">{t.tools}:</span>
+        {DASHBOARD_LINKS.map(({ key, label, url }) => (
+          <a key={key} id={`tool-link-${key}`} className="tool-link" href={url} target="_blank" rel="noreferrer" title={t.toolHelp[key]}>
+            <span>{label}</span>
+            <ExternalLink size={11} aria-hidden="true" />
+            <span className="visually-hidden">{t.toolHelp[key]}</span>
+          </a>
+        ))}
+      </nav>
     </header>
   );
 }

@@ -118,6 +118,14 @@ const en = {
   driftNote: 'The reference data covers one past season only, so drift here can reflect normal seasonal change as well as a real problem.',
   openReport: 'Open full drift report',
   tools: 'Tools',
+  toolHelp: {
+    airflow: 'Run and watch the pipeline',
+    mlflow: 'Compare experiments and registered models',
+    grafana: 'Live API and drift monitoring',
+    prometheus: 'Raw metrics and scrape status',
+    apiDocs: 'Try the API endpoints',
+    driftReport: 'Full data drift report',
+  },
   toolsNote: 'These open only while the local stack is running.',
   features: {
     ndvi_mean: 'NDVI', ndvi_std: 'NDVI spread', ndwi_mean: 'NDWI', ndwi_std: 'NDWI spread', evi_mean: 'EVI', evi_std: 'EVI spread',
@@ -241,6 +249,14 @@ const mr = {
   driftNote: 'संदर्भ माहिती एकाच जुन्या हंगामाची आहे, त्यामुळे हा ड्रिफ्ट खऱ्या समस्येसोबतच सामान्य हंगामी बदलही दाखवू शकतो.',
   openReport: 'संपूर्ण ड्रिफ्ट अहवाल उघडा',
   tools: 'साधने',
+  toolHelp: {
+    airflow: 'पाइपलाइन चालवा व पाहा',
+    mlflow: 'प्रयोग व नोंदणीकृत मॉडेलची तुलना करा',
+    grafana: 'API व ड्रिफ्टचे थेट निरीक्षण',
+    prometheus: 'मूळ मेट्रिक्स व संकलनाची स्थिती',
+    apiDocs: 'API एंडपॉइंट वापरून पाहा',
+    driftReport: 'माहितीतील बदलाचा संपूर्ण अहवाल',
+  },
   toolsNote: 'स्थानिक प्रणाली सुरू असतानाच ही उघडतात.',
   features: {
     ndvi_mean: 'NDVI', ndvi_std: 'NDVI मधील फरक', ndwi_mean: 'NDWI', ndwi_std: 'NDWI मधील फरक', evi_mean: 'EVI', evi_std: 'EVI मधील फरक',
@@ -364,6 +380,14 @@ const hi = {
   driftNote: 'संदर्भ डेटा केवल एक पुराने मौसम का है, इसलिए यह ड्रिफ्ट असली समस्या के साथ सामान्य मौसमी बदलाव भी दिखा सकता है।',
   openReport: 'पूरी ड्रिफ्ट रिपोर्ट खोलें',
   tools: 'टूल',
+  toolHelp: {
+    airflow: 'पाइपलाइन चलाएँ और देखें',
+    mlflow: 'प्रयोगों और पंजीकृत मॉडलों की तुलना करें',
+    grafana: 'API और ड्रिफ्ट की लाइव निगरानी',
+    prometheus: 'मूल मेट्रिक्स और संग्रह की स्थिति',
+    apiDocs: 'API एंडपॉइंट आज़माएँ',
+    driftReport: 'डेटा बदलाव की पूरी रिपोर्ट',
+  },
   toolsNote: 'ये केवल तब खुलते हैं जब स्थानीय सिस्टम चल रहा हो।',
   features: {
     ndvi_mean: 'NDVI', ndvi_std: 'NDVI में अंतर', ndwi_mean: 'NDWI', ndwi_std: 'NDWI में अंतर', evi_mean: 'EVI', evi_std: 'EVI में अंतर',

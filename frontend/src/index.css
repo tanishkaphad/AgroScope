@@ -820,6 +820,36 @@ body::after {
   .kpi-card:hover, .primary-action-btn:hover { transform: none; }
 }
 
+/* Links to the other tools */
+.header-bar { flex-wrap: wrap; row-gap: 0.55rem; }
+
+.tools-bar {
+  flex-basis: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.76rem;
+}
+
+.tools-label { color: var(--text-secondary); margin-right: 0.2rem; }
+
+.tool-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.22rem 0.6rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-primary);
+  font-weight: 600;
+  text-decoration: none;
+  transition: var(--transition-fast);
+}
+
+.tool-link:hover { border-color: var(--brand-cyan); color: var(--brand-cyan); }
+
 /* Header details */
 .brand-area { color: var(--brand-cyan); display: block; }
 
@@ -994,7 +1024,7 @@ body::after {
   .map-layer-toggles .layer-btn { flex: 1; justify-content: center; }
   .map-quick-actions .layer-btn { flex: 1; justify-content: center; }
   #leaflet-map-root { min-height: 340px; }
-  .layer-btn, .lang-btn { min-height: 40px; }
+  .layer-btn, .lang-btn, .tool-link { min-height: 40px; }
   .icon-btn { width: 40px; height: 40px; }
   .map-legend-floating { position: static; border: none; border-top: 1px solid var(--border-subtle); border-radius: 0; box-shadow: none; }
   .sidebar-card { padding: 1rem; }
