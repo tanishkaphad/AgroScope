@@ -56,7 +56,7 @@ Other known gaps:
 - **Data used:** satellite imagery at 10-20 m, summarised to 250 m cells, plus public weather data. There's no personal data.
 - **Users:** the app has no accounts and stores no personal details. It records request counts and timings, not who made a request.
 - **Secrets:** keys are kept in `.env`, outside git.
-- **Future use:** a planned database table holds field feedback, but the app doesn't use it yet. Collecting farm locations or farmer feedback would need informed consent and its own privacy review first.
+- **Future use:** collecting farm locations or farmer feedback would need informed consent and its own privacy review first.
 
 ## Human oversight
 
@@ -68,4 +68,4 @@ A person starts the pipeline and retraining. The gate blocks a model below the m
 - **Weather:** [Open-Meteo](https://open-meteo.com/), under CC BY 4.0.
 - **Maps:** © OpenStreetMap contributors, © CARTO, and EOxCloudless 2025 by EOX IT Services GmbH, containing modified Copernicus Sentinel data.
 
-Map and weather services are used under free, non-commercial terms, so ads, fees or running this as a business would need different licences (D-22).
+Map and weather services are used under free, non-commercial terms, so ads, fees or running this as a business would need different licences.

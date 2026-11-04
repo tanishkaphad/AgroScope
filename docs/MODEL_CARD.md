@@ -81,17 +81,17 @@ The answer rests mainly on evaporative demand with no rain, which matches how th
 
 ![SHAP summary for HIGH stress](../reports/figures/shap_summary.png)
 
-Confidence near 1.0 reflects certainty about the formula, not about the crop. The word `increases_stress` in the output means pushing toward the predicted class, which is misleading when that class is LOW (B-37). Stored map results don't include SHAP values yet (B-28).
+Confidence near 1.0 reflects certainty about the formula, not about the crop. The word `increases_stress` in the output means pushing toward the predicted class, which is misleading when that class is LOW. Stored map results don't include SHAP values yet.
 
 ## Limits
 
 - **Past dates aren't a test:** the dashboard can show all 27 dates, but the model trained on 75% of cells across those dates, so most of each map repeats its training data. Use the later-dates scores above to judge the model, not these maps.
 - **One season:** the data covers one Rabi season, so monsoon and other years are untested.
-- **Little separation:** 97.2% of the vegetated area is HIGH on the published date, so it can't yet rank areas for water (B-27).
-- **Crop and soil are ignored:** every cell uses one crop coefficient of 0.95 (B-19).
-- **Coarse cells:** at 6.25 ha, a cell covers several farms (B-31).
-- **Unreviewed thresholds:** stress thresholds were set before a reflectance fix, and no expert has reviewed them (B-34).
-- **Simulator:** `/predict` fills inputs it isn't given with fixed values, so it's a what-if tool only (B-06).
+- **Little separation:** 97.2% of the vegetated area is HIGH on the published date, so it can't yet rank areas for water.
+- **Crop and soil are ignored:** every cell uses one crop coefficient of 0.95.
+- **Coarse cells:** at 6.25 ha, a cell covers several farms.
+- **Unreviewed thresholds:** stress thresholds were set before a reflectance fix, and no expert has reviewed them.
+- **Simulator:** `/predict` fills inputs it isn't given with fixed values, so it's a what-if tool only.
 
 ## Release and monitoring
 

@@ -32,7 +32,7 @@ def run_shap_example() -> dict:
 
     output = {
         "model_type": type(explainer.model).__name__,
-        "note": "`direction` means pushing toward or away from the predicted class, whichever class that is (B-37).",
+        "note": "`direction` means pushing toward or away from the predicted class, whichever class that is.",
         "examples": examples,
     }
     with open(PROJECT_ROOT / "reports" / "shap_example.json", "w", encoding="utf-8") as f:

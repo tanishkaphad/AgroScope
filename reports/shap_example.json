@@ -1,6 +1,6 @@
 {
   "model_type": "LGBMClassifier",
-  "note": "`direction` means pushing toward or away from the predicted class, whichever class that is (B-37).",
+  "note": "`direction` means pushing toward or away from the predicted class, whichever class that is.",
   "examples": [
     {
       "cell_id": "NLBC_CELL_0115",

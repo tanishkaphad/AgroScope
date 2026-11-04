@@ -56,16 +56,16 @@ The balance shifts sharply toward HIGH later in the season, as the crop matures 
 
 ## Known problems
 
-| Problem | Effect | Reference |
-| :--- | :--- | :--- |
-| Labels use three of the model's own inputs | High scores don't show real-world skill | B-07 |
-| One season only | Monsoon and other years are untested | B-08, B-12 |
-| The vegetated area looks too large | 120,625 ha is reported, more than the 66,250 ha culturable and 84,500 ha gross in the boundary file. The hand-marked boundary may be too broad, and NDVI of 0.15 can include non-crop land | B-35 |
-| The boundary is hand-marked | The project author marked this 28-point outline by hand from the canal's dimensions, and the exact method isn't recorded. The file's own label, "Validated Official Geometry", overstates this, because no authority has validated it. Treat every area figure as approximate | B-35, B-47 |
-| One crop coefficient for everything | Crop type and soil don't affect labels | B-19 |
-| Thresholds not reviewed | They were set before the reflectance fix, and no expert has reviewed them | B-34 |
-| Uneven dates | Some dates cover part of the area, down to 6,537 vegetated cells on 2024-03-29. The published date is the latest covering at least 90% of cells | F-11 |
-| Reprocessed scenes | Some dates have more than one copy of a scene, and only the latest should be used | F-19 |
+| Problem | Effect |
+| :--- | :--- |
+| Labels use three of the model's own inputs | High scores don't show real-world skill |
+| One season only | Monsoon and other years are untested |
+| The vegetated area looks too large | 120,625 ha is reported, more than the 66,250 ha culturable and 84,500 ha gross in the boundary file. The hand-marked boundary may be too broad, and NDVI of 0.15 can include non-crop land |
+| The boundary is hand-marked | The project author marked this 28-point outline by hand from the canal's dimensions, and the exact method isn't recorded. The file's own label, "Validated Official Geometry", overstates this, because no authority has validated it. Treat every area figure as approximate |
+| One crop coefficient for everything | Crop type and soil don't affect labels |
+| Thresholds not reviewed | They were set before the reflectance fix, and no expert has reviewed them |
+| Uneven dates | Some dates cover part of the area, down to 6,537 vegetated cells on 2024-03-29. The published date is the latest covering at least 90% of cells |
+| Reprocessed scenes | Some dates have more than one copy of a scene, and only the latest should be used |
 
 ## Personal data
 
@@ -80,7 +80,7 @@ The data has no names, farm boundaries, ownership records or demographic details
 | Runs and registered models | MLflow, in a Docker volume | MLflow |
 | Code, settings and validation results | GitHub | Git |
 
-Google Drive's free tier limits storage, so new raw scenes aren't downloaded (D-30).
+Google Drive's free tier limits storage, so new raw scenes aren't downloaded.
 
 ## Quality checks
 

@@ -53,10 +53,6 @@ class Settings:
         "*"
     ]
     
-    # Supabase credentials (optional)
-    SUPABASE_URL: str = os.getenv("SUPABASE_URL", "")
-    SUPABASE_KEY: str = os.getenv("SUPABASE_KEY", "")
-
     # Admin token for starting retraining. Retraining is disabled when it's empty.
     RETRAIN_TOKEN: str = os.getenv("RETRAIN_TOKEN", "")
 

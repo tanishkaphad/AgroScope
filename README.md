@@ -119,7 +119,7 @@ Macro F1 from the latest run. **These are measured against labels calculated by 
 | Simulated drift, after shifting 9 inputs | 36%, with all 9 flagged and no others |
 | Largest macro F1 gap between canal reaches | 0.0124 |
 
-Screenshots of each tool are in [docs/screenshots](docs/screenshots). Full details are in the [performance report](reports/performance_report.md), the [model card](docs/MODEL_CARD.md), the [data card](docs/DATA_CARD.md) and the [responsible AI statement](docs/RESPONSIBLE_AI.md). The [demo guide](DEMO_GUIDE.md) and [viva notes](docs/VIVA_NOTES.md) cover how to present it.
+Screenshots of each tool are in [docs/screenshots](docs/screenshots). Full details are in the [performance report](reports/performance_report.md), the [model card](docs/MODEL_CARD.md), the [data card](docs/DATA_CARD.md) and the [responsible AI statement](docs/RESPONSIBLE_AI.md).
 
 ## Limitations
 
@@ -134,7 +134,7 @@ Screenshots of each tool are in [docs/screenshots](docs/screenshots). Full detai
 - **Run by hand:** a person starts the pipeline, and no timer or live data feed exists.
 - **Translations:** no native speaker has reviewed the Marathi and Hindi interface text.
 
-These stay out of scope until after submission: crop type classification, Sentinel-1 radar, advice for individual fields, the Supabase database, scheduled live data and public deployment.
+These stay out of scope until after submission: crop type classification, Sentinel-1 radar, advice for individual fields, a database, scheduled live data and public deployment.
 
 ## AWS extension: not built
 

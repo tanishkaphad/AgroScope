@@ -115,7 +115,7 @@ def build_report() -> str:
             ],
         ),
         "",
-        "**This isn't validated against field outcomes.** No farmer or canal team has acted on these flags, so it counts what the system recommends, not water saved or crops protected. With most of the area in Priority 1, it can't yet help choose where water goes first. The total area also looks too large, because it exceeds the 66,250 ha culturable area in the study area file (see `Bugs.md`, B-27 and B-35).",
+        "**This isn't validated against field outcomes.** No farmer or canal team has acted on these flags, so it counts what the system recommends, not water saved or crops protected. With most of the area in Priority 1, it can't yet help choose where water goes first. The total area also looks too large, because it exceeds the 66,250 ha culturable area in the study area file.",
         "",
         "## Serving performance",
         "",

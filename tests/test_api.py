@@ -58,9 +58,7 @@ def test_health_is_degraded_without_results(no_results):
     assert data["status"] == "DEGRADED"
 
 
-def test_health_reports_database_is_not_connected(monkeypatch):
-    monkeypatch.setattr(settings, "SUPABASE_URL", "https://example.supabase.co")
-    monkeypatch.setattr(settings, "SUPABASE_KEY", "example-key")
+def test_health_reports_database_is_not_connected():
     data = client.get("/health").json()
     assert data["database"].startswith("NOT_CONNECTED")
 
