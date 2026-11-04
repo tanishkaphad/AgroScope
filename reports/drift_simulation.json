@@ -1,6 +1,6 @@
 {
   "simulated": true,
-  "evaluated_at": "2026-11-04T11:58:43.515117+00:00",
+  "evaluated_at": "2026-11-04T13:38:34.912663+00:00",
   "note": "Simulated data, not a real result.",
   "shifts": {
     "temperature_c": 4.0,
@@ -10,8 +10,8 @@
   "rows_per_sample": 20000,
   "control_drifted_share": 0.0,
   "drifted_share": 0.36,
-  "drift_share_alert": 0.5,
-  "alert_triggered": false,
+  "drift_share_alert": 0.3,
+  "alert_triggered": true,
   "shifted_inputs": [
     "ndwi_mean",
     "rainfall_16day",

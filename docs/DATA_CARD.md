@@ -8,7 +8,7 @@ The data behind AgroScope's model and maps, as of 2026-11-04.
 | :--- | :--- | :--- | :--- |
 | Satellite imagery | Sentinel-2 Level-2A, through [Microsoft Planetary Computer](https://planetarycomputer.microsoft.com/dataset/sentinel-2-l2a) | 2023-10-06 to 2024-03-29 | [Copernicus Sentinel data terms](https://sentinels.copernicus.eu/documents/247904/690755/Sentinel_Data_Legal_Notice): free and open, with credit |
 | Weather | [Open-Meteo](https://open-meteo.com/) historical archive | 2023-01-01 to 2024-05-31 | CC BY 4.0, with credit. The free API is for non-commercial use, under 10,000 calls a day |
-| Canal boundary | `data/raw/study_area/command_area.geojson`, in this repository | Static | **Origin not recorded** (see known problems) |
+| Canal boundary | `data/raw/study_area/command_area.geojson`, in this repository, marked by hand by the project author | Static | **Approximate, and the exact method isn't recorded** (see known problems) |
 
 **Map display only:** Carto Voyager or OpenStreetMap for street maps, and EOxCloudless 2025 for satellite. Their credits show on the map, and they aren't model inputs.
 
@@ -60,8 +60,8 @@ The balance shifts sharply toward HIGH later in the season, as the crop matures 
 | :--- | :--- | :--- |
 | Labels use three of the model's own inputs | High scores don't show real-world skill | B-07 |
 | One season only | Monsoon and other years are untested | B-08, B-12 |
-| The vegetated area looks too large | 120,625 ha is reported, more than the 66,250 ha culturable and 84,500 ha gross in the boundary file. The boundary may be too broad, and NDVI of 0.15 can include non-crop land | B-35 |
-| Boundary origin isn't recorded | The file calls itself "Validated Official Geometry", but this project has no record of who validated it or where it came from. It's a simple outline of 28 points, so treat it as approximate | B-35 |
+| The vegetated area looks too large | 120,625 ha is reported, more than the 66,250 ha culturable and 84,500 ha gross in the boundary file. The hand-marked boundary may be too broad, and NDVI of 0.15 can include non-crop land | B-35 |
+| The boundary is hand-marked | The project author marked this 28-point outline by hand from the canal's dimensions, and the exact method isn't recorded. The file's own label, "Validated Official Geometry", overstates this, because no authority has validated it. Treat every area figure as approximate | B-35, B-47 |
 | One crop coefficient for everything | Crop type and soil don't affect labels | B-19 |
 | Thresholds not reviewed | They were set before the reflectance fix, and no expert has reviewed them | B-34 |
 | Uneven dates | Some dates cover part of the area, down to 6,537 vegetated cells on 2024-03-29. The published date is the latest covering at least 90% of cells | F-11 |

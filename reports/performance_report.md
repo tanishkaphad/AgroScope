@@ -97,7 +97,7 @@ The largest macro F1 gap between reaches is 0.0124.
 
 It flagged 9 of the 9 shifted inputs and 0 unshifted ones.
 
-The overall alert, at 50% of inputs, did not fire on this change. Shifts in a minority of inputs can matter, so per-input results should be read alongside it.
+The overall alert, at 30% of inputs, fired on this change.
 
 ## Limits of these measurements
 

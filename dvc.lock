@@ -391,7 +391,7 @@ stages:
       configs/settings.yaml:
         monitoring:
           sample_rows: 20000
-          drift_share_alert: 0.5
+          drift_share_alert: 0.3
         training.features:
         - ndvi_mean
         - ndvi_std
@@ -422,11 +422,11 @@ stages:
     outs:
     - path: data/processed/drift_report.html
       hash: md5
-      md5: 7b509c53a321ffea71d754d84fc75693
+      md5: c7cc8aa8fb622271a99b92afd0c45e0a
       size: 5285766
     - path: data/processed/drift_summary.json
       hash: md5
-      md5: 6a05f184b78c1cc25544e8afdb9cac3d
+      md5: 076e1614f7b1052f94dee85e8965abf5
       size: 4600
   validate_raw:
     cmd: python src/validation/validate_data.py --stage raw

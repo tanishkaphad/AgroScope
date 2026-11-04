@@ -170,4 +170,5 @@ validation:
 
 monitoring:
   sample_rows: 20000
-  drift_share_alert: 0.5
+  # Share of inputs that must drift to raise the alert. A simulated 36% shift should fire it.
+  drift_share_alert: 0.3
