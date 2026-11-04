@@ -2,7 +2,7 @@
 
 How we'll meet the MLOps course rubric in the 2 days left from 2026-11-04. The long-term product roadmap is in [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md), and pauses until this is done.
 
-**Status:** sections 1-7 done. Section 8 to do.
+**Status:** all sections done. Your remaining steps are a GitHub Actions screenshot, `dvc status -c`, the final commit, and practising the demo and viva.
 
 **Rules:** Claude runs no git commands, and every service stays free.
 
@@ -128,12 +128,12 @@ How we'll meet the MLOps course rubric in the 2 days left from 2026-11-04. The l
 
 ## 8. README and evidence
 
-- [ ] Rewrite `README.md` with an architecture diagram, one-command setup, stack and limitations.
-- [ ] Update `DEMO_GUIDE.md` into a five-minute demo with Airflow and Grafana.
-- [ ] Prepare viva notes covering each component, and why each choice was made.
-- [ ] Collect the screenshots listed below into `docs/screenshots/`.
+- [x] Rewrite `README.md` with an architecture diagram, one-command setup, stack and limitations.
+- [x] Update `DEMO_GUIDE.md` into a five-minute demo with Airflow and Grafana.
+- [x] Prepare viva notes covering each component, and why each choice was made.
+- [x] Collect the screenshots listed below into `docs/screenshots/`.
 
-- [ ] State in the README and viva notes that the AWS extension isn't built, and what it would involve.
+- [x] State in the README and viva notes that the AWS extension isn't built, and what it would involve.
 
 **You'll need to do these:** take the screenshots, or tell Claude if you'd like help with them, and run the final commits.
 
@@ -141,19 +141,19 @@ How we'll meet the MLOps course rubric in the 2 days left from 2026-11-04. The l
 
 | Item | Evidence | Status |
 | :--- | :--- | :--- |
-| GitHub repository | Commit history | In progress |
-| README | Architecture and one-command setup | To do |
-| DVC | `dvc.lock`, `dvc dag`, `dvc status -c` | Available, needs a screenshot |
-| MLflow | Experiment and registry screenshots | To do |
-| Airflow | DAG source and successful-run screenshot | To do |
-| FastAPI | Swagger page screenshot | Available, needs a screenshot |
-| Docker | Dockerfile and Compose file | Dockerfile done |
-| GitHub Actions | Successful workflow screenshot | Available, needs a screenshot |
-| Monitoring | Grafana dashboard and simulated drift | To do |
-| Responsible AI | Model card, data card and statement | To do |
-| Performance | Report with all six metrics | To do |
-| Demo | Five-minute run-through | To do |
-| Viva | Your notes and practice | To do |
+| GitHub repository | Commit history | Final commit to run |
+| README | Architecture and one-command setup | Done |
+| DVC | `dvc.lock`, `docs/screenshots/dvc_dag.txt`, `dvc_status.txt` | Done, except `dvc status -c`, which needs your Drive sign-in |
+| MLflow | `mlflow_runs.png`, `mlflow_registry.png` | Done |
+| Airflow | `airflow/dags/agroscope_pipeline.py`, `airflow_dag_success.jpg` | Done |
+| FastAPI | `swagger_api_docs.png` | Done |
+| Docker | `Dockerfile`, `docker-compose.yml` | Done |
+| GitHub Actions | Successful workflow screenshot | Passing, needs your screenshot |
+| Monitoring | `grafana_monitoring.png`, `prometheus_targets.png`, `evidently_drift_report.png` | Done |
+| Responsible AI | `docs/MODEL_CARD.md`, `DATA_CARD.md`, `RESPONSIBLE_AI.md` | Done |
+| Performance | `reports/performance_report.md` | Done |
+| Demo | `DEMO_GUIDE.md` | Written, needs your practice |
+| Viva | `docs/VIVA_NOTES.md` | Written, needs your practice |
 | AWS | Not built for now, stated in the README | Deferred |
 
 ## What gets cut if time runs short

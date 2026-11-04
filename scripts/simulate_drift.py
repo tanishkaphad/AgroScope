@@ -46,7 +46,7 @@ def apply_shift(frame: pd.DataFrame) -> pd.DataFrame:
 
 
 def compare(reference: pd.DataFrame, current: pd.DataFrame) -> tuple[Dict[str, Any], Any]:
-    result = Report([DataDriftPreset()]).run(current_data=current, reference_data=reference)
+    result = Report([DataDriftPreset(drift_share=MONITORING["drift_share_alert"])]).run(current_data=current, reference_data=reference)
     return parse_drift_metrics(result.dict()["metrics"]), result
 
 

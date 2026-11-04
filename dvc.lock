@@ -385,8 +385,8 @@ stages:
       size: 545
     - path: src/monitoring/drift.py
       hash: md5
-      md5: 481f331ad66fea7661a5556f13deb150
-      size: 4941
+      md5: c4facb559bb4305adc87680f558080af
+      size: 4984
     params:
       configs/settings.yaml:
         monitoring:
@@ -422,11 +422,11 @@ stages:
     outs:
     - path: data/processed/drift_report.html
       hash: md5
-      md5: c7cc8aa8fb622271a99b92afd0c45e0a
+      md5: 6727f6e9ccf3a84b84b241206c17dcb1
       size: 5285766
     - path: data/processed/drift_summary.json
       hash: md5
-      md5: 076e1614f7b1052f94dee85e8965abf5
+      md5: 8585dc8c50b7146d9f081e61b907ea9b
       size: 4600
   validate_raw:
     cmd: python src/validation/validate_data.py --stage raw

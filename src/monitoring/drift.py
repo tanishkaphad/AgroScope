@@ -94,7 +94,7 @@ def run_drift_check(
     current_sample = current.sample(min(sample_rows, len(current)), random_state=TRAINING["random_state"])
 
     logger.info("Comparing %d rows from %s with %d training-period rows...", len(current_sample), current_date, len(reference_sample))
-    result = Report([DataDriftPreset()]).run(current_data=current_sample, reference_data=reference_sample)
+    result = Report([DataDriftPreset(drift_share=MONITORING["drift_share_alert"])]).run(current_data=current_sample, reference_data=reference_sample)
     result.save_html(str(output_dir / "drift_report.html"))
 
     parsed = parse_drift_metrics(result.dict()["metrics"])

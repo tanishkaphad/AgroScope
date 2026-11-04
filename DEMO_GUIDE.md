@@ -1,153 +1,123 @@
 # AgroScope Demo Guide
 
-How to run and present AgroScope's MLOps work. Run everything from the project root, with the virtual environment active.
+A five-minute demo of AgroScope's MLOps work. Practise it once with a timer.
 
 ## One-line summary
 
-AgroScope is a satellite and weather pipeline for crop water stress on the Nira Left Bank Canal. It's versioned with DVC, tracked in MLflow, released through a promotion gate, and monitored for data drift with Evidently.
+AgroScope turns satellite and weather data into crop water stress estimates for the Nira Left Bank Canal, with a versioned pipeline, tracked experiments, a release gate, orchestration and live monitoring.
 
 ## Before the demo
 
-Activate the environment:
+**Do this at least 10 minutes before.**
+
+1. Close the old Windows copies of the API and MLflow. They answer on `127.0.0.1`, and could show old data:
 
 ```powershell
-.venv\Scripts\Activate.ps1
+Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -match 'uvicorn' -and $_.CommandLine -match 'AgroScope|api.app.main' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }
 ```
 
-Add a local retraining token to `.env`, choosing your own value:
+2. Start the stack, and wait until the API shows as healthy:
 
-```text
-RETRAIN_TOKEN=choose-a-private-value
+```bash
+docker compose up -d
+```
+```bash
+docker compose ps
 ```
 
-Start each of these in its own terminal, with the environment active:
+3. Send some traffic so Grafana has something to show. Do this about 3 minutes before you start, because its charts cover recent activity:
 
-```powershell
-uvicorn api.app.main:app
+```bash
+.venv/Scripts/python scripts/load_test.py --users 5 --duration 30
 ```
 
-```powershell
-npm run dev --prefix frontend
-```
+The load test overwrites `reports/load_test_results.json`. To keep the submitted numbers, add `--output reports/demo_load_test.json` and don't commit that file.
 
-```powershell
-mlflow ui --backend-store-uri sqlite:///mlflow.db --port 5000
-```
+4. Open these tabs in order, using `localhost`, not `127.0.0.1`:
 
-| Page | Address |
+| Tab | Address |
 | :--- | :--- |
-| Dashboard | http://localhost:5173 |
-| API docs | http://localhost:8000/docs |
+| Dashboard | http://localhost:8000/dashboard/ |
+| Airflow, signed in as `admin` / `admin` | http://localhost:8080 |
 | MLflow | http://localhost:5000 |
-| Drift report | http://localhost:8000/api/v1/monitoring/drift/report |
+| Grafana | http://localhost:3000 |
+| API docs | http://localhost:8000/docs |
 
-## Demo order
+5. Open a terminal in the project root, and have `dvc dag` ready to run. Activate the environment first with `.venv\Scripts\Activate.ps1`.
 
-### 1. The pipeline
+## The five minutes
 
-```powershell
-dvc dag
-```
-
-```powershell
-dvc status
-```
-
-**Point out:** every stage from weather to drift is defined in `dvc.yaml`, settings are in `configs/settings.yaml`, and data is stored on Google Drive.
-
-### 2. Experiment tracking
-
-Open MLflow, then the `agroscope-water-stress` experiment.
-
-**Point out:** each run records its settings, scores, data version hash and model files.
-
-### 3. Model registry and promotion
-
-In MLflow, open **Models**, then `agroscope-stress-classifier`, and show the `champion` alias. Then show `reports/promotion_decision.json`.
-
-**Point out:** training only creates a candidate. It replaces the champion only if its later-dates score is at least as good. Otherwise, the champion stays live.
-
-### 4. Drift monitoring
-
-Open the dashboard, click **Model Status**, then **Open full report**.
-
-**Point out:** this is a real Evidently comparison between the training period and the published date. All 25 inputs show drift, because March is much hotter and drier than October to January. With only one season of data, this can't separate normal seasonal change from a real problem.
-
-### 5. Retraining
-
-In PowerShell, use your own token:
-
-```powershell
-curl.exe -X POST -H "X-Admin-Token: your-token" http://localhost:8000/api/v1/retrain
-```
-
-```powershell
-curl.exe http://localhost:8000/api/v1/retrain/status
-```
-
-**Point out:** this takes about 2 minutes. It retrains, applies the gate, rebuilds the maps and drift report, then reloads the API. A missing or wrong token gets a 403.
-
-### 6. Testing
-
-```powershell
-pytest tests -v
-```
-
-**Point out:** the tests cover the API's error handling, weather and satellite ingestion, the promotion gate rejecting a worse model, and drift parsing. GitHub Actions runs them too.
-
-### 7. Packaged API
-
-```powershell
-docker build -t agroscope-api:local .
-```
-
-```powershell
-docker run --rm -p 8000:8000 agroscope-api:local
-```
-
-Stop the normal API first, because both use port 8000. The dashboard is then at http://localhost:8000/dashboard/.
-
-**Point out:** the image carries the champion model, results and API, but not the training tools, so `/retrain` is disabled there. The image is about 2.7 GB. Building it needs `dvc pull` and `npm run build --prefix frontend` first on a fresh clone.
-
-## Honest results
-
-These are measured against labels calculated from a formula, not field observations.
-
-| XGBoost test | Macro F1 | What it means |
+| Time | Show | Say |
 | :--- | :--- | :--- |
-| Unseen cells, same dates | 0.9967 | Looks excellent, but the labels use three of the inputs |
-| Later dates | 0.9176 | A fairer test of future dates |
-| Later dates, without those three inputs | 0.7439 | Shows how much of the score came from reproducing the formula |
+| 0:00 | Dashboard | "This estimates crop water stress for the canal from satellite and weather data." |
+| 0:30 | Airflow, then `dvc dag` | "One DAG runs every step, and each task is a DVC stage." |
+| 1:30 | MLflow | "Three models, compared fairly, with a gate before release." |
+| 2:30 | Grafana | "Live request, latency, prediction and drift metrics." |
+| 3:15 | Dashboard, Model Status | "Here's what the system tells us about itself." |
+| 4:00 | The honest results | "These scores have a catch, and here's what it is." |
+| 4:30 | What isn't built | "This is what's missing, including AWS." |
 
-**Key message:** the gate uses the later-dates score, not the most flattering one.
+## 0:00 Dashboard (30 seconds)
 
-## Problems found and fixed
+1. Point out the date bar: past data, with 1,500 of 19,300 cells shown.
+2. Change the date to **10 December 2023**, then to **24 March 2024**. HIGH stress goes from 9.2% to 97.2% across the season.
+3. Zoom into the map and click a cell, because cells are too small to click at full view. Switch to **मराठी** to show its advice in Marathi.
 
-- **Reflectance bug:** Sentinel-2's +1000 offset was never removed. Mean NDVI across all dates went from 0.249 to 0.405 after the fix.
-- **Wind units:** requests didn't ask for m/s, so values were very likely km/h.
-- **Single weather point:** every cell shared one point. There are now 24.
-- **Fake outputs:** invented API and dashboard data is gone. Missing data now shows a clear error.
+## 0:30 Airflow and DVC (1 minute)
 
-## Likely questions
+1. Open `agroscope_pipeline` and show the successful run in the grid view.
+2. Name the tasks: ingestion, validation, preprocessing, features, validation, training, evaluation, registration, prediction and drift.
+3. Run `dvc dag` in the terminal.
 
-**Is this accurate enough for farmers to use?**
-No. There's no field validation yet, and an agronomist should review the thresholds first.
+**Point out:** each task calls a DVC stage, so unchanged steps are skipped. A rerun with nothing changed took about 90 seconds. Validation failures stop the run before training.
 
-**Why not report 99.7%?**
-Because that mostly reflects the model reproducing its own label formula.
+## 1:30 MLflow (1 minute)
 
-**Does the app update daily?**
-Not yet. Weather forecasts, new-scene search and cloud feature extraction work by hand, but no scheduled job connects them to the app yet.
+1. Open the `agroscope-water-stress` experiment, and compare the `random_forest`, `xgboost` and `lightgbm` runs.
+2. Open **Models**, then `agroscope-stress-classifier`, and show the `champion` alias and the version's tags.
 
-**How big is the storage saving from cloud features?**
-On one tested scene, 827 KB instead of 198 MB.
+**Point out:** the best later-dates score becomes the candidate. It's released only if it reaches 0.85 and at least matches the champion. A worse model is rejected and the champion stays, and tests prove it.
 
-## What isn't built
+## 2:30 Grafana (45 seconds)
 
-Say this before you're asked:
+Show requests per second, error rate, inference latency, and the drift panel with `published` and `simulated`.
 
-- **From the full problem statement:** crop type classification, growth-stage stress and Sentinel-1 radar data.
-- **Live operation:** scheduled runs and a public deployment. The API runs in Docker locally.
-- **Data limits:** one season of model data, and no field validation.
-- **Reported area:** the 120,625 ha vegetated area is larger than the 84,500 ha gross command area in the study area file, so the boundary and NDVI threshold need checking.
-- **MLflow history:** runs are stored locally, so a fresh clone starts with no champion.
+**Point out:** the load test measured 170.79 requests a second with a p95 of 150.5 ms and no errors, and those numbers are in the performance report.
+
+## 3:15 Model Status (45 seconds)
+
+Click **Model Status** on the dashboard. Show the three scores, the promotion decision and the top drifted inputs. Open the full Evidently report if time allows.
+
+**Point out:** drift is 100% on the published date, mostly normal seasonal change, because the reference is one season. A simulated test shows the monitor works: 0% on unchanged data, and 36% with exactly the 9 shifted inputs flagged, which fires the 30% alert.
+
+## 4:00 The honest results (30 seconds)
+
+| Test | LightGBM macro F1 |
+| :--- | :--- |
+| Unseen cells | 0.9966 |
+| Later dates, used by the gate | 0.9242 |
+| Later dates, without the label inputs | 0.6707 |
+
+**Say:** "The labels come from a formula that uses three of the model's inputs, so high scores mostly mean it has relearned the formula. The last row is the fairer guide, and nothing has been checked in the field."
+
+## 4:30 What isn't built (30 seconds)
+
+**Say this before you're asked:**
+
+- **AWS:** not built, by decision. The README shows how each part would move.
+- **Field validation:** none yet.
+- **Live data:** one past season, and a person starts each run.
+- **From the wider plan:** crop type classification, Sentinel-1 radar and advice for individual fields.
+
+## If something goes wrong
+
+| Problem | Fix |
+| :--- | :--- |
+| API not healthy | Wait a minute, then run `docker compose restart api` |
+| Old data or an old look | Check the address says `localhost`, and close the old Windows copies |
+| Dashboard shows old results after a DAG run | `docker compose restart api` |
+| Empty Grafana charts | Set the time range to the last 30 minutes, and send traffic with the load test |
+| MLflow is empty | Run `agroscope_pipeline`. Don't use `docker compose down -v`, which deletes this data |
+| A tool won't open | Show the screenshot from `docs/screenshots/` |
+
+The full viva preparation is in [docs/VIVA_NOTES.md](docs/VIVA_NOTES.md).

@@ -362,7 +362,7 @@
     },
     {
       "id": 9,
-      "title": "Published map by stress class",
+      "title": "Published map by stress class (hectares)",
       "description": "Hectares per class on the published map.",
       "type": "bargauge",
       "datasource": {
@@ -390,7 +390,53 @@
         "defaults": {
           "unit": "short"
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "HIGH"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#dc2626"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "MODERATE"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#d97706"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "LOW"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#059669"
+                }
+              }
+            ]
+          }
+        ]
       },
       "options": {
         "reduceOptions": {
@@ -398,7 +444,8 @@
             "lastNotNull"
           ]
         },
-        "orientation": "horizontal"
+        "orientation": "horizontal",
+        "displayMode": "basic"
       }
     },
     {
