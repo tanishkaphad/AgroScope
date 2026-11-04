@@ -1,20 +1,22 @@
 # AgroScope Implementation Plan
 
-**Goal:** turn AgroScope into a tool people use daily to answer one question: *which areas need water next, and how much?* Every forecast gets checked against what the satellite later observes.
+**Goal:** turn AgroScope into a tool people use daily to answer one question: *should I water my farm, when, and how much?* Every forecast gets checked against what the satellite later observes.
 
-**Status:** Phase 1 done. Phase 0 needs only the DVC remote. Phase 2 is next. Last updated 2026-11-03.
+**Status:** Phase 1 done. Phase 0 needs only CI's Drive access. Phase 2 is in progress. Last updated 2026-11-04.
 
 **Git rule:** Claude never runs git operations. The project owner runs them all.
 
-## Assumptions
+**Cost rule:** every external service stays on a free tier. Check current limits before adopting one.
 
-Change these first if they're wrong, because they affect the later phases.
+## Key decisions
 
-| Decision | Assumption | Affects |
-| :--- | :--- | :--- |
-| First user | Canal section officers, water user associations and extension staff | Phases 3 and 6 |
-| Geography | Nira Left Bank Canal only, until it's useful there | All phases |
-| Grid | Keep the 250 m grid and report by section or village | Phases 2, 3 and 6 |
+| Decision | Choice | Status | Affects |
+| :--- | :--- | :--- | :--- |
+| First user | Farmers who control their own water, such as well, borewell and drip users. Canal farmers and canal teams come later. | Confirmed | Phases 3 and 6 |
+| Cost | Free tiers only, and the app stays non-commercial for now | Confirmed | All phases |
+| Data storage | Google Drive as the DVC remote | Confirmed | Phase 0 |
+| Geography | Nira Left Bank Canal only, until it's useful there | Assumed | All phases |
+| Farm detail | Farmers mark their own field, and it's read at 10–20 m. The 250 m grid stays for area overviews. | Assumed | Phases 2, 3 and 6 |
 | Infrastructure | Scheduled jobs and Postgres, with no Celery or Kubernetes | Phases 2 and 5 |
 
 ## Starting point
@@ -41,14 +43,14 @@ Reported in `PROJECT_ROAST.md`, to confirm when working on each item:
 | 0. Stabilize the repo | Code is committed and rebuilds cleanly | None | Small |
 | 1. Make it honest | The app never shows invented data | 0 | Small |
 | 2. Make it live | Results refresh daily without manual work | 1 | Large |
-| 3. Trustworthy advice | Daily water-need estimates for each cell | 2 | Medium |
+| 3. Advice for one farm | A farmer marks a field and gets daily water advice for it | 2 | Large |
 | 4. A real model job | A model tested against future observations | 2, 3 | Large |
 | 5. Real MLOps loop | Models are monitored, retrained and promoted on evidence | 2, 4 | Medium |
-| 6. Daily habit | Users get a morning summary and can give feedback | 3 | Medium |
+| 6. Daily habit | Farmers get advice on their phones in their language and give feedback | 3 | Large |
 
 Phases 4 and 6 can run in parallel once Phase 3 is done. Phase 6 needs Phase 5 only for its model accuracy display.
 
-**User research runs alongside all of this.** Speak to 3–5 target users before Phase 3 is finished, and ask how water decisions are made today.
+**Farmer conversations run alongside all of this.** Speak to 5–10 farmers before Phase 3 is finished, starting with those who control their own water. Ask how they decide to water today, what phone they use, and what would make them trust the advice. For expert review, approach a Krishi Vigyan Kendra or an agricultural university.
 
 ---
 
@@ -64,7 +66,8 @@ Phases 4 and 6 can run in parallel once Phase 3 is done. Phase 6 needs Phase 5 o
 - [x] Skip tests that need a model or frontend build when those files are missing.
 - [x] Initialize DVC and track `data/raw/satellite`.
 - [x] Run `dvc repro` from raw data to model.
-- [ ] Set up a DVC remote, then make CI run `dvc pull` so the skipped tests run there.
+- [x] Add the Google Drive remote and run `dvc push`.
+- [ ] Add a service account and the `GDRIVE_CREDENTIALS_DATA` secret, so CI's new `dvc pull` step runs the skipped tests.
 
 **Done when:** a fresh clone can get the data and run `dvc repro` from raw data to model, and CI passes without relying on files only you have.
 
@@ -88,45 +91,59 @@ Phases 4 and 6 can run in parallel once Phase 3 is done. Phase 6 needs Phase 5 o
 **Goal:** the system updates itself every day.
 
 ### Configuration
-- [ ] Move URLs, thresholds, feature lists, crop tables and dates into `configs/settings.yaml`.
+- [x] Move URLs, thresholds, feature lists, crop tables and dates into `configs/settings.yaml`. Advisory rules stay in code until Phase 3 rewrites them.
 
 ### Weather
-- [ ] Replace the single weather point with a coarse grid across the canal area, interpolated to cells.
-- [ ] Add 7-day forecasts to `src/ingestion/fetch_weather.py`.
-- [ ] Check the weather provider's terms and rate limits for this use.
+- [x] Replace the single weather point with a 24-point grid across the canal area, with each cell using its nearest point.
+- [x] Add 7-day forecasts to `src/ingestion/fetch_weather.py`.
+- [x] Check the weather provider's terms and rate limits for this use: under 10,000 calls a day, non-commercial, with credit shown.
+- [x] Run `dvc repro` with the new weather grid and the reflectance fix.
 
 ### Satellite
-- [ ] Make `src/ingestion/fetch_satellite.py` incremental, so it only handles scenes it hasn't seen.
-- [ ] Read only the needed area from cloud-hosted scenes, and keep derived features rather than raw downloads.
-- [ ] Record each scene's cloud cover and whether it was used.
+- [x] Make `src/ingestion/fetch_satellite.py` incremental, so it only handles scenes it hasn't seen.
+- [x] Calculate features directly from cloud-hosted scenes and keep only the results, about 0.3–0.8 MB per scene instead of about 200 MB. Tested on an older and the newest scene.
+- [ ] Process the new scenes, extend the weather dates, and feed the results into the pipeline. Check whether a scene now takes less than the 8–13 minutes measured during `dvc push`.
+- [x] Record each scene's cloud cover and download status in the manifest.
 
 ### Storage and scheduling
+- [ ] Check the study area boundary, because the published vegetated area is larger than the official command area (B-35).
 - [ ] Apply and extend `supabase/migrations/001_initial_schema.sql` with tables for runs, daily features, predictions and model versions.
 - [ ] Remove the Pune and crop defaults from the schema.
 - [ ] Change `api/app/services/geo_service.py` to read the latest results from Postgres, not local GeoJSON or a fixed date list.
 - [ ] Fix the `Dockerfile`, which copies `models/` and `data/processed/` even though neither is in a fresh clone.
+- [ ] Check free-tier limits for API hosting, Postgres and scheduled jobs, and replace any that aren't free in practice.
 - [ ] Add a scheduled daily job, starting with GitHub Actions if the runtime fits.
 - [ ] Add input checks that stop publishing on missing, stale or out-of-range data.
 - [ ] Alert on failed runs, and show the last successful update in the UI.
 
 **Done when:** the app has run for 14 days in a row without manual steps, and shows today's weather-based results with the latest clear satellite date.
 
-## Phase 3: Trustworthy advice
+## Phase 3: Advice for one farm
 
-**Goal:** replace the circular stress label with a transparent, physically based estimate. This also gives Phase 4 its baseline.
+**Goal:** a farmer marks a field and gets advice they can act on. This replaces the circular stress label with a transparent estimate, and gives Phase 4 its baseline.
 
-- [ ] Create `src/waterbalance/` with a daily FAO-56 soil water balance for each cell.
-- [ ] Add soil water capacity from a soil dataset such as SoilGrids.
-- [ ] Add crop type and sowing dates. Start with user or section-level input and a season calendar, not a crop classifier.
-- [ ] Use the existing crop coefficient table in `src/target/generate_labels.py`, moved to config, by growth stage.
-- [ ] Use NDVI to adjust for how much crop cover each cell actually has.
-- [ ] Add canal rotation dates and section boundaries if users can provide them.
-- [ ] Change the output to "irrigate within N days, about X mm", with a confidence level.
+### The farm
+- [ ] Let a farmer mark a field by tapping the map or using phone location, then adjust its boundary.
+- [ ] Ask for crop, sowing date and water source: canal, well, borewell, drip or rain only.
+- [ ] Read that field's Sentinel-2 pixels only when needed, at 10–20 m, instead of processing the whole canal in advance.
+- [ ] Say so when a field is too small or too cloudy to read reliably.
+
+### The advice
+- [ ] Create `src/waterbalance/` with a daily FAO-56 soil water balance for each field.
+- [ ] Add soil water capacity from a free soil dataset such as SoilGrids.
+- [ ] Use crop coefficients by growth stage, moved to config from `src/target/generate_labels.py`.
+- [ ] Use NDVI to adjust for how much crop cover the field actually has.
+- [ ] Use the 7-day forecast, so the app can say "rain is likely, wait".
+- [ ] Change the output to "water within N days, about X mm", in units farmers use, with a confidence level.
+- [ ] Fit advice to the water source. Canal users need advice that fits their next water turn, so add rotation dates where available.
 - [ ] Rewrite `src/advisory/advisory_engine.py` to use this output, and move Marathi and Hindi text to locale files.
-- [ ] Add section and village rankings to the API.
-- [ ] Review the results with an agronomist or extension officer.
 
-**Done when:** target users review a week of rankings and say they broadly match what they see in the field. Record what they disagree with.
+### Safety and trust
+- [ ] Show the reason for each piece of advice in plain words, and when the data was last updated.
+- [ ] Review the method and wording with an agronomist or agricultural extension officer before farmers rely on it.
+- [ ] Say clearly that it's guidance, and check against what farmers see in their fields.
+
+**Done when:** 5 or more farmers have followed advice for their own fields for two weeks, and an agronomist has reviewed it. Record every case where they disagreed with it.
 
 ## Phase 4: A real model job
 
@@ -167,17 +184,19 @@ Phases 4 and 6 can run in parallel once Phase 3 is done. Phase 6 needs Phase 5 o
 
 ## Phase 6: Daily habit
 
-**Goal:** useful information reaches people without them having to open a dashboard.
+**Goal:** farmers get what they need on their phones without having to open a dashboard.
 
-- [ ] Add login with roles for operator, section staff and admin, and restrict CORS to your frontends.
-- [ ] Let users choose their sections, language and alert preferences.
-- [ ] Send a morning summary, starting with one channel. WhatsApp is the likely fit, but check its costs and approval steps first.
-- [ ] Add a mobile-first page with a ranked list, and keep the map as a secondary view.
-- [ ] Add "Did you irrigate?" and "Was this right?" feedback, stored with the forecast it refers to.
+- [ ] Build a mobile-first installable web app that shows "my farm today" first, with the map as a secondary view.
+- [ ] Make it work on low-end phones and weak networks, and show the last saved advice when offline.
+- [ ] Use Marathi by default in this area, with simple words, icons and read-aloud where possible.
+- [ ] Choose a low-cost sign-in. SMS codes usually cost money, so check free options first.
+- [ ] Send daily or as-needed alerts through a free channel. Check web push and Telegram first; WhatsApp and SMS may not stay free at scale.
+- [ ] Restrict CORS to your frontends, and let farmers view and delete their farm data.
+- [ ] Add "Did you water?" and "Was this right?" feedback, stored with the forecast it refers to.
 - [ ] Feed that feedback into Phase 5 evaluation as field evidence.
 - [ ] Add basic usage analytics, and get consent for any personal data you store.
 
-**Done when:** at least 3 real users have used it weekly for 4 weeks and given feedback, and at least one has made a water decision using it.
+**Done when:** at least 10 farmers have used it weekly for 4 weeks and given feedback, and most say it helped a real water decision.
 
 ---
 
@@ -186,14 +205,14 @@ Phases 4 and 6 can run in parallel once Phase 3 is done. Phase 6 needs Phase 5 o
 Only start these once the Nira canal version is in regular use:
 
 - **Other canals:** automatic UTM zones, cell names from the input boundary, and no fixed map centre or Veer Dam marker.
-- **Advice for individual farms:** 10–20 m pixels and farm boundaries.
+- **Canal teams and other users:** views built from the same data, such as area demand and rotation planning.
 - **Crop classifier:** replaces manual crop input once there are enough confirmed crop labels.
 
 ## Ongoing measures
 
 | Measure | What it shows |
 | :--- | :--- |
-| Weekly active users, and how many act on the advice | Whether people find it useful |
+| Weekly active farmers, and how many act on the advice | Whether farmers find it useful |
 | Forecast error compared with the baselines | Whether the model adds value |
 | Days with on-time results | Whether people can rely on it |
 | Share of forecasts later scored | Whether the evaluation loop is working |
@@ -201,7 +220,7 @@ Only start these once the Nira canal version is in regular use:
 
 ## First tasks
 
-1. Set up the DVC remote and make CI run `dvc pull`.
-2. Replace the watermarked base map (B-26).
-3. Book the first conversations with target users.
+1. Add the Google Drive remote and run `dvc push`.
+2. Add a free Carto key.
+3. Arrange the first conversations with farmers.
 4. Start Phase 2 with `configs/settings.yaml`.

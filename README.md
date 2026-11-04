@@ -68,7 +68,7 @@ python src/ingestion/fetch_satellite.py --start-date 2023-10-01 --end-date 2024-
 ## Run the tests
 
 ```powershell
-pytest tests/test_api.py -v
+pytest tests -v
 ```
 
 Tests that need a trained model, prediction results or a frontend build are skipped when those files are missing.

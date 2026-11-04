@@ -2,6 +2,37 @@ import React, { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import { Eye, Layers, Maximize2, Navigation, ZoomIn } from 'lucide-react';
 
+const CARTO_API_KEY = import.meta.env.VITE_CARTO_API_KEY;
+
+const BASE_LAYERS = {
+  street: CARTO_API_KEY
+    ? {
+        url: `https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png?key=${CARTO_API_KEY}`,
+        options: {
+          subdomains: 'abcd',
+          maxNativeZoom: 18,
+          maxZoom: 18,
+          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>, &copy; <a href="https://carto.com/attribution/">CARTO</a>',
+        },
+      }
+    : {
+        url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+        options: {
+          maxZoom: 18,
+          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+        },
+      },
+  // Free for non-commercial use only. Commercial use needs a paid EOX licence.
+  satellite: {
+    url: 'https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2025_3857/default/GoogleMapsCompatible/{z}/{y}/{x}.jpg',
+    options: {
+      maxNativeZoom: 14,
+      maxZoom: 18,
+      attribution: 'EOxCloudless <a href="https://cloudless.eox.at">https://cloudless.eox.at</a> by <a href="https://eox.at/">EOX IT Services GmbH</a> (Contains modified Copernicus Sentinel data 2025)',
+    },
+  },
+};
+
 export default function MapContainer({
   studyAreaGeoJson,
   stressMapGeoJson,
@@ -23,17 +54,7 @@ export default function MapContainer({
   const dataLayerRef = useRef(null);
   const selectedFeatureLayerRef = useRef(null);
 
-  const [baseMap, setBaseMap] = useState('dark'); // 'dark' | 'satellite'
-
-  const tileLayers = {
-    dark: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-    satellite: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-  };
-
-  const tileAttributions = {
-    dark: '&copy; OpenStreetMap contributors &copy; CARTO',
-    satellite: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community',
-  };
+  const [baseMap, setBaseMap] = useState('street'); // 'street' | 'satellite'
 
   // Initialize Leaflet Map
   useEffect(() => {
@@ -43,16 +64,13 @@ export default function MapContainer({
       center: [18.18, 74.45],
       zoom: 10,
       zoomControl: false,
-      attributionControl: false,
     });
 
     L.control.zoom({ position: 'topright' }).addTo(map);
+    map.attributionControl.addAttribution('Weather: <a href="https://open-meteo.com/">Open-Meteo</a>');
 
     // Initial base layer
-    const baseTile = L.tileLayer(tileLayers.dark, {
-      maxZoom: 18,
-      attribution: tileAttributions.dark,
-    }).addTo(map);
+    const baseTile = L.tileLayer(BASE_LAYERS.street.url, BASE_LAYERS.street.options).addTo(map);
 
     mapInstanceRef.current = map;
     mapInstanceRef.current._baseTile = baseTile;
@@ -87,10 +105,7 @@ export default function MapContainer({
     if (!map || !map._baseTile) return;
 
     map.removeLayer(map._baseTile);
-    const newTile = L.tileLayer(tileLayers[baseMap], {
-      maxZoom: 18,
-      attribution: tileAttributions[baseMap],
-    }).addTo(map);
+    const newTile = L.tileLayer(BASE_LAYERS[baseMap].url, BASE_LAYERS[baseMap].options).addTo(map);
     map._baseTile = newTile;
     newTile.bringToBack();
   }, [baseMap]);
@@ -247,12 +262,12 @@ export default function MapContainer({
           <button
             type="button"
             className="layer-btn"
-            onClick={() => setBaseMap(baseMap === 'dark' ? 'satellite' : 'dark')}
+            onClick={() => setBaseMap(baseMap === 'street' ? 'satellite' : 'street')}
             title="Toggle Base Tile"
             id="toggle-basemap-btn"
           >
             <Eye size={14} />
-            <span>{baseMap === 'dark' ? 'Satellite' : 'Dark Carto'}</span>
+            <span>{baseMap === 'street' ? 'Satellite' : 'Street Map'}</span>
           </button>
           <button
             type="button"

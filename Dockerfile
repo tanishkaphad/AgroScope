@@ -24,6 +24,7 @@ COPY --from=builder /root/.local /root/.local
 ENV PATH=/root/.local/bin:$PATH
 ENV PYTHONUNBUFFERED=1
 
+COPY configs/ ./configs/
 COPY src/ ./src/
 COPY api/ ./api/
 COPY models/ ./models/

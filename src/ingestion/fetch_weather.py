@@ -1,8 +1,8 @@
 """AgroScope Weather Data Ingestion Module.
 
-Fetches historical and near-real-time weather observations for the Canal
-Command Area using the Open-Meteo Historical Weather API (100% Free, no API
-key required).
+Fetches daily weather for a grid of points across the Canal Command Area using
+the Open-Meteo Historical Weather and Forecast APIs (free for non-commercial
+use, no API key required, data licensed under CC BY 4.0).
 
 Required Variables:
     - Daily Precipitation / Rainfall (mm)
@@ -20,11 +20,21 @@ import json
 import logging
 import sys
 import time
+from datetime import date
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+import numpy as np
 import pandas as pd
 import requests
+from shapely.geometry import Point, shape
+
+# Ensure project root is in sys.path
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from src.config import settings
 
 logging.basicConfig(
     level=logging.INFO,
@@ -33,106 +43,96 @@ logging.basicConfig(
 )
 logger = logging.getLogger("agroscope.weather_ingestion")
 
-OPEN_METEO_ARCHIVE_URL = "https://archive-api.open-meteo.com/v1/archive"
-OPEN_METEO_FORECAST_URL = "https://api.open-meteo.com/v1/forecast"
+WEATHER = settings["weather"]
 
 
-def load_command_area_bounds(geojson_path: Path) -> Tuple[float, float, Dict[str, Any]]:
-    """Load study area GeoJSON and compute centroid (lat, lon) and metadata."""
+def load_command_area(geojson_path: Path) -> Tuple[Any, Dict[str, Any]]:
+    """Load study area GeoJSON and return its polygon geometry and metadata."""
     if not geojson_path.exists():
         raise FileNotFoundError(f"Command area GeoJSON not found at: {geojson_path}")
 
     with open(geojson_path, "r", encoding="utf-8") as f:
         data = json.load(f)
 
-    # Find the polygon boundary feature
-    polygon_feature = None
     for feat in data.get("features", []):
         if feat.get("geometry", {}).get("type") in ("Polygon", "MultiPolygon"):
-            polygon_feature = feat
-            break
+            properties = feat.get("properties", {})
+            logger.info("Study Area Loaded: %s", properties.get("name", "Unknown AOI"))
+            return shape(feat["geometry"]), properties
 
-    if not polygon_feature:
-        raise ValueError(f"No Polygon geometry found in {geojson_path}")
-
-    coords = polygon_feature["geometry"]["coordinates"]
-    # Handle single Polygon exterior ring
-    ring = coords[0] if polygon_feature["geometry"]["type"] == "Polygon" else coords[0][0]
-
-    lons = [pt[0] for pt in ring]
-    lats = [pt[1] for pt in ring]
-
-    centroid_lon = sum(lons) / len(lons)
-    centroid_lat = sum(lats) / len(lats)
-
-    properties = polygon_feature.get("properties", {})
-    logger.info(
-        "Study Area Loaded: %s | Centroid: Lat %.4f, Lon %.4f",
-        properties.get("name", "Unknown AOI"),
-        centroid_lat,
-        centroid_lon,
-    )
-    return centroid_lat, centroid_lon, properties
+    raise ValueError(f"No Polygon geometry found in {geojson_path}")
 
 
-def fetch_weather_timeseries(
+def build_weather_grid(geometry: Any, spacing_deg: float) -> List[Dict[str, Any]]:
+    """Build evenly spaced weather points in and just around the study area."""
+    min_lon, min_lat, max_lon, max_lat = geometry.bounds
+    lons = np.arange(np.floor(min_lon / spacing_deg), np.ceil(max_lon / spacing_deg) + 1) * spacing_deg
+    lats = np.arange(np.floor(min_lat / spacing_deg), np.ceil(max_lat / spacing_deg) + 1) * spacing_deg
+
+    # A half-cell buffer keeps a nearby point for cells close to the boundary
+    search_area = geometry.buffer(spacing_deg / 2)
+
+    points: List[Dict[str, Any]] = []
+    for lat in lats:
+        for lon in lons:
+            if search_area.contains(Point(lon, lat)):
+                points.append({
+                    "weather_point_id": f"WX_{len(points):03d}",
+                    "latitude": round(float(lat), 4),
+                    "longitude": round(float(lon), 4),
+                })
+
+    if not points:
+        raise ValueError(f"No weather points fell inside the study area at {spacing_deg} degree spacing.")
+
+    logger.info("Built weather grid with %d points at %s degree spacing.", len(points), spacing_deg)
+    return points
+
+
+def request_daily_weather(
+    url: str,
     lat: float,
     lon: float,
-    start_date: str,
-    end_date: str,
+    extra_params: Dict[str, Any],
     max_retries: int = 3,
     backoff_factor: float = 2.0,
 ) -> pd.DataFrame:
-    """Fetch daily weather parameters from Open-Meteo Archive API.
+    """Fetch daily weather for one point from an Open-Meteo endpoint.
 
     Args:
-        lat: Latitude of AOI centroid.
-        lon: Longitude of AOI centroid.
-        start_date: Start date string (YYYY-MM-DD).
-        end_date: End date string (YYYY-MM-DD).
+        url: Open-Meteo API endpoint.
+        lat: Latitude of the point.
+        lon: Longitude of the point.
+        extra_params: Date range or forecast length parameters.
         max_retries: Number of request retry attempts.
         backoff_factor: Exponential backoff factor.
 
     Returns:
         DataFrame containing date-indexed weather metrics.
     """
-    daily_variables = [
-        "temperature_2m_max",
-        "temperature_2m_min",
-        "temperature_2m_mean",
-        "precipitation_sum",
-        "rain_sum",
-        "relative_humidity_2m_mean",
-        "wind_speed_10m_max",
-        "shortwave_radiation_sum",
-        "et0_fao_evapotranspiration",
-    ]
-
     params = {
-        "latitude": round(lat, 4),
-        "longitude": round(lon, 4),
-        "start_date": start_date,
-        "end_date": end_date,
-        "daily": ",".join(daily_variables),
-        "timezone": "Asia/Kolkata",
+        "latitude": lat,
+        "longitude": lon,
+        "daily": ",".join(WEATHER["daily_variables"]),
+        "timezone": WEATHER["timezone"],
+        "wind_speed_unit": "ms",
+        **extra_params,
     }
-
-    logger.info("Requesting weather data from Open-Meteo (%s to %s)...", start_date, end_date)
 
     response = None
     for attempt in range(1, max_retries + 1):
         try:
-            response = requests.get(OPEN_METEO_ARCHIVE_URL, params=params, timeout=30)
+            response = requests.get(url, params=params, timeout=30)
             response.raise_for_status()
             break
         except requests.exceptions.RequestException as err:
             logger.warning("Attempt %d failed: %s", attempt, err)
             if attempt == max_retries:
                 raise RuntimeError(f"Failed to fetch weather data after {max_retries} attempts.") from err
-            time.sleep(backoff_factor * attempt)
+            rate_limited = err.response is not None and err.response.status_code == 429
+            time.sleep(WEATHER["rate_limit_wait_s"] if rate_limited else backoff_factor * attempt)
 
-    data = response.json()
-    daily = data.get("daily", {})
+    daily = response.json().get("daily", {})
     if not daily or "time" not in daily:
         raise ValueError("Invalid response payload received from Open-Meteo API.")
 
@@ -155,9 +155,20 @@ def fetch_weather_timeseries(
     df["date"] = pd.to_datetime(df["date"])
     df.sort_values("date", inplace=True)
     df.reset_index(drop=True, inplace=True)
-
-    logger.info("Successfully fetched %d daily weather records.", len(df))
     return df
+
+
+def fetch_grid_weather(points: List[Dict[str, Any]], url: str, extra_params: Dict[str, Any]) -> pd.DataFrame:
+    """Fetch weather for every grid point, one request per point."""
+    frames = []
+    for idx, point in enumerate(points, start=1):
+        logger.info("[%d/%d] Fetching weather for %s...", idx, len(points), point["weather_point_id"])
+        df = request_daily_weather(url, point["latitude"], point["longitude"], extra_params)
+        for key, value in point.items():
+            df[key] = value
+        frames.append(df)
+        time.sleep(WEATHER["request_delay_s"])
+    return pd.concat(frames, ignore_index=True)
 
 
 def calculate_water_balance_features(df: pd.DataFrame) -> pd.DataFrame:
@@ -187,52 +198,85 @@ def calculate_water_balance_features(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+def add_grid_features(df: pd.DataFrame) -> pd.DataFrame:
+    """Calculate rolling features separately for each weather point."""
+    frames = [
+        calculate_water_balance_features(group.sort_values("date"))
+        for _, group in df.groupby("weather_point_id", sort=True)
+    ]
+    return pd.concat(frames, ignore_index=True)
+
+
 def run_weather_pipeline(
     geojson_path: Optional[Path] = None,
     output_dir: Optional[Path] = None,
-    start_date: str = "2023-01-01",
-    end_date: str = "2024-05-31",
+    start_date: str = WEATHER["start_date"],
+    end_date: str = WEATHER["end_date"],
 ) -> Path:
-    """Execute complete weather data ingestion and processing pipeline."""
-    base_dir = Path(__file__).resolve().parent.parent.parent
-    if geojson_path is None:
-        geojson_path = base_dir / "data" / "raw" / "study_area" / "command_area.geojson"
-    if output_dir is None:
-        output_dir = base_dir / "data" / "raw" / "weather"
-
+    """Fetch past weather across the grid and save it with rolling features."""
+    geojson_path = geojson_path or (PROJECT_ROOT / "data" / "raw" / "study_area" / "command_area.geojson")
+    output_dir = output_dir or (PROJECT_ROOT / "data" / "raw" / "weather")
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    lat, lon, metadata = load_command_area_bounds(geojson_path)
-    df_raw = fetch_weather_timeseries(lat, lon, start_date=start_date, end_date=end_date)
-    df_features = calculate_water_balance_features(df_raw)
+    geometry, _ = load_command_area(geojson_path)
+    points = build_weather_grid(geometry, WEATHER["grid_spacing_deg"])
 
-    # Attach command area metadata
-    df_features["aoi_id"] = metadata.get("id", "AOI_NLBC_PUNE")
-    df_features["latitude"] = round(lat, 4)
-    df_features["longitude"] = round(lon, 4)
+    logger.info("Requesting weather history from Open-Meteo (%s to %s)...", start_date, end_date)
+    df_raw = fetch_grid_weather(points, WEATHER["archive_url"], {"start_date": start_date, "end_date": end_date})
+    df_features = add_grid_features(df_raw)
+    df_features["aoi_id"] = settings["aoi"]["id"]
 
     output_file = output_dir / "daily_weather.csv"
     df_features.to_csv(output_file, index=False)
-    logger.info("Saved complete weather dataset to: %s", output_file)
+    logger.info("Saved weather history with %d rows to: %s", len(df_features), output_file)
     logger.info("Summary Statistics:\n%s", df_features[["rainfall_8day", "temp_8day_mean", "et0_8day_sum"]].describe().to_string())
 
     return output_file
 
 
+def run_forecast_pipeline(
+    geojson_path: Optional[Path] = None,
+    output_dir: Optional[Path] = None,
+    forecast_days: int = WEATHER["forecast_days"],
+) -> Path:
+    """Fetch the latest weather forecast across the grid and save it."""
+    geojson_path = geojson_path or (PROJECT_ROOT / "data" / "raw" / "study_area" / "command_area.geojson")
+    output_dir = output_dir or (PROJECT_ROOT / "data" / "raw" / "weather")
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    geometry, _ = load_command_area(geojson_path)
+    points = build_weather_grid(geometry, WEATHER["grid_spacing_deg"])
+
+    logger.info("Requesting %d-day forecast from Open-Meteo...", forecast_days)
+    df = fetch_grid_weather(points, WEATHER["forecast_url"], {"forecast_days": forecast_days})
+    df["forecast_issued_on"] = date.today().isoformat()
+    df["aoi_id"] = settings["aoi"]["id"]
+
+    output_file = output_dir / "forecast_weather.csv"
+    df.to_csv(output_file, index=False)
+    logger.info("Saved forecast with %d rows to: %s", len(df), output_file)
+
+    return output_file
+
+
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Fetch historical weather data for AgroScope AOI.")
-    parser.add_argument("--start-date", type=str, default="2023-01-01", help="Start date (YYYY-MM-DD)")
-    parser.add_argument("--end-date", type=str, default="2024-05-31", help="End date (YYYY-MM-DD)")
+    parser = argparse.ArgumentParser(description="Fetch weather data for AgroScope AOI.")
+    parser.add_argument("--start-date", type=str, default=WEATHER["start_date"], help="Start date (YYYY-MM-DD)")
+    parser.add_argument("--end-date", type=str, default=WEATHER["end_date"], help="End date (YYYY-MM-DD)")
     parser.add_argument("--geojson", type=str, default=None, help="Path to study area GeoJSON")
     parser.add_argument("--outdir", type=str, default=None, help="Output directory for weather CSV")
+    parser.add_argument("--forecast", action="store_true", help="Fetch the latest forecast instead of past weather")
 
     args = parser.parse_args()
     geojson_p = Path(args.geojson) if args.geojson else None
     out_p = Path(args.outdir) if args.outdir else None
 
-    run_weather_pipeline(
-        geojson_path=geojson_p,
-        output_dir=out_p,
-        start_date=args.start_date,
-        end_date=args.end_date,
-    )
+    if args.forecast:
+        run_forecast_pipeline(geojson_path=geojson_p, output_dir=out_p)
+    else:
+        run_weather_pipeline(
+            geojson_path=geojson_p,
+            output_dir=out_p,
+            start_date=args.start_date,
+            end_date=args.end_date,
+        )

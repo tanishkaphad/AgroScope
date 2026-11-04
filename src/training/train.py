@@ -39,6 +39,13 @@ from sklearn.model_selection import GroupShuffleSplit
 from sklearn.utils.class_weight import compute_sample_weight
 from xgboost import XGBClassifier
 
+# Ensure project root is in sys.path
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from src.config import settings
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
@@ -46,40 +53,14 @@ logging.basicConfig(
 )
 logger = logging.getLogger("agroscope.training")
 
-# Canonical feature list for training (excludes target and direct leakage columns)
-FEATURE_COLUMNS = [
-    # Biophysical & Water Indices
-    "ndvi_mean",
-    "ndvi_std",
-    "ndwi_mean",
-    "ndwi_std",
-    "evi_mean",
-    "evi_std",
-    # Spectral Bands
-    "b02_mean",
-    "b03_mean",
-    "b04_mean",
-    "b08_mean",
-    "b11_mean",
-    "b12_mean",
-    # Weather Observations & Rolling Lags
-    "temp_mean_c",
-    "temp_max_c",
-    "humidity_pct",
-    "wind_speed_mps",
-    "solar_radiation_mj",
-    "rainfall_8day",
-    "rainfall_16day",
-    "rainfall_30day",
-    "temp_8day_mean",
-    "temp_30day_mean",
-    "temp_8day_max",
-    "et0_8day_sum",
-    "et0_16day_sum",
-]
+TRAINING = settings["training"]
 
-TARGET_COL = "target_stress_class"
-SPLIT_DATE_THRESHOLD = "2024-02-01"
+# Canonical feature list for training (excludes target and direct leakage columns)
+FEATURE_COLUMNS = TRAINING["features"]
+
+TARGET_COL = TRAINING["target_column"]
+SPLIT_DATE_THRESHOLD = TRAINING["temporal_split_date"]
+RANDOM_STATE = TRAINING["random_state"]
 
 
 def prepare_datasets(
@@ -106,11 +87,11 @@ def prepare_datasets(
     # Optional downsampling for rapid local experimentation if requested
     if sample_size and len(df) > sample_size:
         logger.info("Sampling %d rows for rapid training...", sample_size)
-        df = df.sample(n=sample_size, random_state=42).copy()
+        df = df.sample(n=sample_size, random_state=RANDOM_STATE).copy()
 
     if strategy == "spatial" and "cell_id" in df.columns:
         # Spatial Block Holdout (Phase 11): 25% of agricultural fields held out as unseen blocks
-        gss = GroupShuffleSplit(n_splits=1, test_size=0.25, random_state=42)
+        gss = GroupShuffleSplit(n_splits=1, test_size=TRAINING["spatial_test_size"], random_state=RANDOM_STATE)
         train_idx, test_idx = next(gss.split(df, groups=df["cell_id"]))
         X_train = df.iloc[train_idx][FEATURE_COLUMNS]
         y_train = df.iloc[train_idx][TARGET_COL].astype(int)
@@ -148,8 +129,8 @@ def prepare_datasets(
 def train_baseline_random_forest(
     X_train: pd.DataFrame,
     y_train: pd.Series,
-    n_estimators: int = 100,
-    max_depth: int = 12,
+    n_estimators: int = TRAINING["random_forest"]["n_estimators"],
+    max_depth: int = TRAINING["random_forest"]["max_depth"],
 ) -> RandomForestClassifier:
     """Train class-balanced Random Forest baseline."""
     logger.info("Training Baseline Random Forest (n_estimators=%d, max_depth=%d)...", n_estimators, max_depth)
@@ -158,7 +139,7 @@ def train_baseline_random_forest(
         max_depth=max_depth,
         class_weight="balanced",
         n_jobs=-1,
-        random_state=42,
+        random_state=RANDOM_STATE,
     )
     rf.fit(X_train, y_train)
     logger.info("Random Forest baseline training completed.")
@@ -168,9 +149,9 @@ def train_baseline_random_forest(
 def train_xgboost_classifier(
     X_train: pd.DataFrame,
     y_train: pd.Series,
-    n_estimators: int = 150,
-    max_depth: int = 6,
-    learning_rate: float = 0.08,
+    n_estimators: int = TRAINING["xgboost"]["n_estimators"],
+    max_depth: int = TRAINING["xgboost"]["max_depth"],
+    learning_rate: float = TRAINING["xgboost"]["learning_rate"],
 ) -> XGBClassifier:
     """Train weighted XGBoost classifier."""
     logger.info("Training Main Model: XGBoost Classifier (n_estimators=%d, max_depth=%d, lr=%.2f)...", n_estimators, max_depth, learning_rate)
@@ -182,12 +163,12 @@ def train_xgboost_classifier(
         n_estimators=n_estimators,
         max_depth=max_depth,
         learning_rate=learning_rate,
-        subsample=0.8,
-        colsample_bytree=0.8,
+        subsample=TRAINING["xgboost"]["subsample"],
+        colsample_bytree=TRAINING["xgboost"]["colsample_bytree"],
         objective="multi:softprob",
         num_class=3,
         eval_metric="mlogloss",
-        random_state=42,
+        random_state=RANDOM_STATE,
         n_jobs=-1,
     )
     xgb.fit(X_train, y_train, sample_weight=sample_weights)

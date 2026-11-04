@@ -3,7 +3,11 @@
 stages:
   acquire_weather:
     cmd: python src/ingestion/fetch_weather.py --geojson data/raw/study_area/command_area.geojson
+    params:
+      - configs/settings.yaml:
+          - weather
     deps:
+      - src/config.py
       - src/ingestion/fetch_weather.py
       - data/raw/study_area/command_area.geojson
     outs:
@@ -11,7 +15,14 @@ stages:
 
   preprocess_satellite:
     cmd: python src/preprocessing/preprocess_bands.py
+    params:
+      - configs/settings.yaml:
+          - aoi
+          - satellite.valid_scl_classes
+          - satellite.boa_add_offset
+          - satellite.feature_version
     deps:
+      - src/config.py
       - src/preprocessing/preprocess_bands.py
       - data/raw/study_area/command_area.geojson
       - data/raw/satellite
@@ -21,7 +32,11 @@ stages:
 
   generate_labels:
     cmd: python src/target/generate_labels.py
+    params:
+      - configs/settings.yaml:
+          - labels
     deps:
+      - src/config.py
       - src/target/generate_labels.py
       - data/raw/weather/daily_weather.csv
       - data/processed/satellite_grid_features.csv
@@ -31,7 +46,11 @@ stages:
 
   train_evaluate:
     cmd: python src/training/train.py
+    params:
+      - configs/settings.yaml:
+          - training
     deps:
+      - src/config.py
       - src/training/train.py
       - data/features/features.csv
     outs:
@@ -42,7 +61,13 @@ stages:
 
   predict_cycle:
     cmd: python src/inference/predict.py
+    params:
+      - configs/settings.yaml:
+          - inference
+          - aoi.cell_area_ha
+          - labels.min_vegetated_ndvi
     deps:
+      - src/config.py
       - src/inference/predict.py
       - src/inference/explainability.py
       - src/advisory/advisory_engine.py

@@ -29,6 +29,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.advisory.advisory_engine import IrrigationAdvisoryEngine
+from src.config import settings
 from src.inference.explainability import ModelExplainer
 
 logging.basicConfig(
@@ -38,8 +39,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger("agroscope.inference")
 
-CELL_AREA_HECTARES = 6.25  # 250m x 250m = 62,500 m² = 6.25 ha
-MIN_LATEST_COVERAGE = 0.9  # "latest" skips dates where a partial scene covers less of the grid
+CELL_AREA_HECTARES = settings["aoi"]["cell_area_ha"]
+MIN_LATEST_COVERAGE = settings["inference"]["min_latest_coverage"]  # "latest" skips dates where a partial scene covers less of the grid
 
 
 class AgroScopePredictor:
@@ -133,7 +134,7 @@ class AgroScopePredictor:
         logger.info("Cycle %s contains %d spatial cells.", target_date, total_cells)
 
         # Separate vegetated crops from fallow/bare soil
-        is_veg_mask = cycle_df["is_vegetated"] == True if "is_vegetated" in cycle_df.columns else (cycle_df["ndvi_mean"] >= 0.15)
+        is_veg_mask = cycle_df["is_vegetated"] == True if "is_vegetated" in cycle_df.columns else (cycle_df["ndvi_mean"] >= settings["labels"]["min_vegetated_ndvi"])
         veg_df = cycle_df[is_veg_mask].copy()
         logger.info("Active crop canopy cells for inference: %d (%.1f%%)", len(veg_df), (len(veg_df) / total_cells) * 100)
 

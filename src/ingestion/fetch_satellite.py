@@ -25,6 +25,7 @@ import argparse
 import json
 import logging
 import sys
+from datetime import date
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -36,6 +37,13 @@ from rasterio.windows import from_bounds
 from rasterio.warp import transform_bounds
 from shapely.geometry import shape
 
+# Ensure project root is in sys.path
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from src.config import settings
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
@@ -43,18 +51,11 @@ logging.basicConfig(
 )
 logger = logging.getLogger("agroscope.satellite_ingestion")
 
-PLANETARY_COMPUTER_STAC_URL = "https://planetarycomputer.microsoft.com/api/stac/v1"
+SATELLITE = settings["satellite"]
+MANIFEST_NAME = "scenes_manifest.csv"
 
 # Target bands for vegetation & water stress indices (NDVI, NDWI, EVI)
-TARGET_BANDS = {
-    "B02": "blue",
-    "B03": "green",
-    "B04": "red",
-    "B08": "nir",
-    "B11": "swir16",
-    "B12": "swir22",
-    "SCL": "scl",
-}
+TARGET_BANDS = SATELLITE["bands"]
 
 
 def load_command_area_info(geojson_path: Path) -> Tuple[List[float], List[str], Dict[str, Any]]:
@@ -86,7 +87,7 @@ def load_command_area_info(geojson_path: Path) -> Tuple[List[float], List[str], 
     raw_tiles = properties.get("sentinel2_mgrs_tiles")
     if not raw_tiles:
         single = properties.get("sentinel2_mgrs_tile")
-        mgrs_tiles = [single] if single else ["43QDA", "43QDV"]
+        mgrs_tiles = [single] if single else settings["aoi"]["default_mgrs_tiles"]
     elif isinstance(raw_tiles, list):
         mgrs_tiles = raw_tiles
     else:
@@ -108,7 +109,7 @@ def search_sentinel2_scenes(
     bbox: List[float],
     start_date: str,
     end_date: str,
-    max_cloud_cover: float = 20.0,
+    max_cloud_cover: float = SATELLITE["max_cloud_pct"],
     mgrs_tiles: Optional[List[str]] = None,
 ) -> List[Any]:
     """Query Microsoft Planetary Computer STAC catalog for Sentinel-2 L2A scenes."""
@@ -120,13 +121,13 @@ def search_sentinel2_scenes(
     )
 
     catalog = pystac_client.Client.open(
-        PLANETARY_COMPUTER_STAC_URL,
+        SATELLITE["stac_url"],
         modifier=planetary_computer.sign_inplace,
     )
 
     # Query by collection, bbox and datetime window
     search = catalog.search(
-        collections=["sentinel-2-l2a"],
+        collections=[SATELLITE["collection"]],
         bbox=bbox,
         datetime=f"{start_date}/{end_date}",
     )
@@ -224,17 +225,53 @@ def download_windowed_band(
     return True
 
 
+def load_manifest(output_dir: Path) -> pd.DataFrame:
+    """Load the existing scene manifest, or an empty one on the first run."""
+    manifest_path = output_dir / MANIFEST_NAME
+    if manifest_path.exists() and manifest_path.stat().st_size > 0:
+        return pd.read_csv(manifest_path)
+    return pd.DataFrame(columns=["scene_id", "acquisition_date"])
+
+
+def merge_manifest(existing: pd.DataFrame, new_records: List[Dict[str, Any]]) -> pd.DataFrame:
+    """Add new scene records to the manifest, keeping the newest record per scene."""
+    frames = [df for df in (existing, pd.DataFrame(new_records)) if not df.empty]
+    if not frames:
+        return existing
+    merged = pd.concat(frames, ignore_index=True).drop_duplicates("scene_id", keep="last")
+    return merged.sort_values(["acquisition_date", "scene_id"]).reset_index(drop=True)
+
+
+def is_scene_complete(scene_dir: Path) -> bool:
+    """Check that every target band has already been downloaded for a scene."""
+    return all(
+        (scene_dir / f"{band}.tif").exists() and (scene_dir / f"{band}.tif").stat().st_size > 1000
+        for band in TARGET_BANDS
+    )
+
+
+def resolve_since_last_start(manifest: pd.DataFrame, default_start: str) -> str:
+    """Start a search from the newest scene date already in the manifest."""
+    if manifest.empty:
+        return default_start
+    return str(manifest["acquisition_date"].max())
+
+
 def fetch_satellite_data(
     geojson_path: Optional[Path] = None,
     output_dir: Optional[Path] = None,
-    start_date: str = "2023-10-01",
-    end_date: str = "2024-03-31",
-    max_cloud_cover: float = 20.0,
+    start_date: str = SATELLITE["start_date"],
+    end_date: str = SATELLITE["end_date"],
+    max_cloud_cover: float = SATELLITE["max_cloud_pct"],
     mgrs_tiles: Optional[List[str]] = None,
     dry_run: bool = False,
     max_scenes: Optional[int] = None,
+    since_last: bool = False,
 ) -> Path:
     """Execute complete satellite search and acquisition pipeline.
+
+    With since_last, searches from the newest known scene up to today and leaves
+    known scenes alone. The manifest keeps every scene seen across runs.
 
     Default date window focuses on the Rabi season (Oct 2023 - Mar 2024),
     which is the primary irrigated cropping season in Maharashtra.
@@ -250,6 +287,12 @@ def fetch_satellite_data(
     bbox, default_tiles, properties = load_command_area_info(geojson_path)
     target_tiles = mgrs_tiles if mgrs_tiles is not None else default_tiles
 
+    existing_manifest = load_manifest(output_dir)
+    known_scene_ids = set(existing_manifest["scene_id"])
+    if since_last:
+        start_date = resolve_since_last_start(existing_manifest, start_date)
+        end_date = date.today().isoformat()
+
     scenes = search_sentinel2_scenes(
         bbox=bbox,
         start_date=start_date,
@@ -257,6 +300,9 @@ def fetch_satellite_data(
         max_cloud_cover=max_cloud_cover,
         mgrs_tiles=target_tiles,
     )
+
+    new_scenes = [item for item in scenes if item.id not in known_scene_ids]
+    logger.info("%d of %d scenes are new.", len(new_scenes), len(scenes))
 
     if max_scenes and len(scenes) > max_scenes:
         logger.info("Limiting download to first %d scenes as requested.", max_scenes)
@@ -293,7 +339,13 @@ def fetch_satellite_data(
             "mgrs_tile": scene_tile or "",
         }
 
-        if not dry_run:
+        if scene_id in known_scene_ids and (dry_run or is_scene_complete(output_dir / f"{acq_date}_{scene_id}")):
+            logger.info("  Scene already known, skipping.")
+            continue
+
+        if dry_run:
+            record["status"] = "found"
+        else:
             scene_dir = output_dir / f"{acq_date}_{scene_id}"
 
             # Dynamically refresh SAS token per scene to prevent 403 token expiration on long runs
@@ -334,6 +386,8 @@ def fetch_satellite_data(
                         dest_path.unlink(missing_ok=True)
                     record[f"path_{band_key}"] = None
 
+            record["status"] = "complete" if is_scene_complete(scene_dir) else "incomplete"
+
             # Clean up empty scene directory if no bands were successfully downloaded
             if scene_dir.exists() and not any(scene_dir.iterdir()):
                 try:
@@ -343,8 +397,8 @@ def fetch_satellite_data(
 
         manifest_records.append(record)
 
-    manifest_df = pd.DataFrame(manifest_records)
-    manifest_path = output_dir / "scenes_manifest.csv"
+    manifest_df = merge_manifest(existing_manifest, manifest_records)
+    manifest_path = output_dir / MANIFEST_NAME
     manifest_df.to_csv(manifest_path, index=False)
     logger.info("Saved satellite scenes manifest to: %s", manifest_path)
     logger.info(
@@ -362,25 +416,30 @@ if __name__ == "__main__":
     parser.add_argument(
         "--start-date",
         type=str,
-        default="2023-10-01",
-        help="Start date (YYYY-MM-DD), default: 2023-10-01 (Rabi season)",
+        default=SATELLITE["start_date"],
+        help="Start date (YYYY-MM-DD)",
     )
     parser.add_argument(
         "--end-date",
         type=str,
-        default="2024-03-31",
-        help="End date (YYYY-MM-DD), default: 2024-03-31",
+        default=SATELLITE["end_date"],
+        help="End date (YYYY-MM-DD)",
     )
     parser.add_argument(
         "--max-cloud",
         type=float,
-        default=15.0,
-        help="Maximum cloud cover percentage allowed (default: 15.0)",
+        default=SATELLITE["max_cloud_pct"],
+        help="Maximum cloud cover percentage allowed",
     )
     parser.add_argument(
         "--dry-run",
         action="store_true",
         help="Search and catalog scenes only without downloading raster bands",
+    )
+    parser.add_argument(
+        "--since-last",
+        action="store_true",
+        help="Search from the newest known scene up to today, ignoring the date options",
     )
     parser.add_argument(
         "--max-scenes",
@@ -428,4 +487,5 @@ if __name__ == "__main__":
         mgrs_tiles=parsed_tiles,
         dry_run=args.dry_run,
         max_scenes=args.max_scenes,
+        since_last=args.since_last,
     )

@@ -1,0 +1,116 @@
+# AgroScope pipeline settings.
+# DVC reruns a stage when the section it depends on changes.
+
+aoi:
+  id: AOI_NLBC_PUNE
+  crs: "EPSG:32643"
+  cell_size_m: 250.0
+  cell_area_ha: 6.25
+  cell_id_prefix: NLBC_CELL
+  grid_name: nira_command_area_grid_250m
+  default_mgrs_tiles: [43QDA, 43QDV]
+
+satellite:
+  stac_url: https://planetarycomputer.microsoft.com/api/stac/v1
+  collection: sentinel-2-l2a
+  start_date: "2023-10-01"
+  end_date: "2024-03-31"
+  max_cloud_pct: 15.0
+  # Added to raw values to remove ESA's reflectance offset (processing baseline 04.00 onwards)
+  boa_add_offset: -1000
+  # Raise this when the feature calculation changes, so old per-scene caches aren't reused
+  feature_version: 2
+  feature_dir: data/features/scene_features
+  bands:
+    B02: blue
+    B03: green
+    B04: red
+    B08: nir
+    B11: swir16
+    B12: swir22
+    SCL: scl
+  # Sentinel-2 scene classes kept as usable: vegetation, bare soil, water, unclassified
+  valid_scl_classes: [4, 5, 6, 7]
+
+weather:
+  archive_url: https://archive-api.open-meteo.com/v1/archive
+  forecast_url: https://api.open-meteo.com/v1/forecast
+  timezone: Asia/Kolkata
+  start_date: "2023-01-01"
+  end_date: "2024-05-31"
+  forecast_days: 7
+  grid_spacing_deg: 0.1
+  # Open-Meteo counts a long date range as many calls, and allows 600 a minute
+  request_delay_s: 4.0
+  rate_limit_wait_s: 65
+  daily_variables:
+    - temperature_2m_max
+    - temperature_2m_min
+    - temperature_2m_mean
+    - precipitation_sum
+    - rain_sum
+    - relative_humidity_2m_mean
+    - wind_speed_10m_max
+    - shortwave_radiation_sum
+    - et0_fao_evapotranspiration
+
+labels:
+  default_kc: 0.95
+  effective_rainfall_fraction: 0.8
+  min_vegetated_ndvi: 0.15
+  deficit_low_mm: 12.0
+  deficit_high_mm: 28.0
+  canopy_buffer:
+    ndwi_dry: 0.02
+    ndwi_range: 0.16
+    max_fraction: 0.75
+  # FAO-56 crop coefficients. Not used in labels yet; Phase 3 applies them by growth stage.
+  crop_kc:
+    Wheat: {initial: 0.40, mid_season: 1.15, late_season: 0.35, season_average: 0.90}
+    Sugarcane: {initial: 0.80, mid_season: 1.25, late_season: 0.75, season_average: 1.10}
+    Gram_Chana: {initial: 0.40, mid_season: 1.00, late_season: 0.35, season_average: 0.75}
+    Jowar: {initial: 0.35, mid_season: 1.05, late_season: 0.55, season_average: 0.80}
+
+training:
+  target_column: target_stress_class
+  temporal_split_date: "2024-02-01"
+  spatial_test_size: 0.25
+  random_state: 42
+  features:
+    - ndvi_mean
+    - ndvi_std
+    - ndwi_mean
+    - ndwi_std
+    - evi_mean
+    - evi_std
+    - b02_mean
+    - b03_mean
+    - b04_mean
+    - b08_mean
+    - b11_mean
+    - b12_mean
+    - temp_mean_c
+    - temp_max_c
+    - humidity_pct
+    - wind_speed_mps
+    - solar_radiation_mj
+    - rainfall_8day
+    - rainfall_16day
+    - rainfall_30day
+    - temp_8day_mean
+    - temp_30day_mean
+    - temp_8day_max
+    - et0_8day_sum
+    - et0_16day_sum
+  random_forest:
+    n_estimators: 100
+    max_depth: 12
+  xgboost:
+    n_estimators: 150
+    max_depth: 6
+    learning_rate: 0.08
+    subsample: 0.8
+    colsample_bytree: 0.8
+
+inference:
+  min_latest_coverage: 0.9

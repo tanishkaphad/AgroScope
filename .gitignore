@@ -44,7 +44,7 @@ mlruns/
 
 # Large Geospatial & Raw Satellite Files (Tracked via DVC, NOT Git)
 data/raw/satellite/*
-data/raw/weather/daily_weather.csv
+data/raw/weather/*.csv
 !data/raw/satellite/*.dvc
 *.tif
 *.tiff

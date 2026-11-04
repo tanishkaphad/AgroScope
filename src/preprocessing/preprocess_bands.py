@@ -32,6 +32,13 @@ from rasterio.warp import reproject, transform_geom
 from rasterio.windows import from_bounds
 from shapely.geometry import box, mapping, shape
 
+# Ensure project root is in sys.path
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from src.config import settings
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
@@ -43,10 +50,12 @@ logger = logging.getLogger("agroscope.preprocessing")
 # 0: NO_DATA, 1: SATURATED_OR_DEFECTIVE, 2: CAST_SHADOW, 3: CLOUD_SHADOWS,
 # 4: VEGETATION, 5: NOT_VEGETATED, 6: WATER, 7: UNCLASSIFIED,
 # 8: CLOUD_MEDIUM_PROBA, 9: CLOUD_HIGH_PROBA, 10: THIN_CIRRUS, 11: SNOW_OR_ICE
-VALID_SCL_CLASSES = {4, 5, 6, 7}
+VALID_SCL_CLASSES = set(settings["satellite"]["valid_scl_classes"])
+AOI = settings["aoi"]
+BOA_ADD_OFFSET = settings["satellite"]["boa_add_offset"]
 
 
-def load_and_project_aoi(geojson_path: Path, target_crs: str = "EPSG:32643") -> Tuple[Any, Tuple[float, float, float, float]]:
+def load_and_project_aoi(geojson_path: Path, target_crs: str = AOI["crs"]) -> Tuple[Any, Tuple[float, float, float, float]]:
     """Load AOI boundary GeoJSON and project polygon geometry to target UTM CRS."""
     if not geojson_path.exists():
         raise FileNotFoundError(f"AOI GeoJSON not found at: {geojson_path}")
@@ -72,8 +81,8 @@ def load_and_project_aoi(geojson_path: Path, target_crs: str = "EPSG:32643") -> 
 def generate_spatial_grid(
     aoi_shape: Any,
     bounds: Tuple[float, float, float, float],
-    target_crs: str = "EPSG:32643",
-    cell_size_meters: float = 250.0,
+    target_crs: str = AOI["crs"],
+    cell_size_meters: float = AOI["cell_size_m"],
     output_geojson: Optional[Path] = None,
 ) -> List[Dict[str, Any]]:
     """Generate or load regular 250m x 250m grid cells across the AOI."""
@@ -112,7 +121,7 @@ def generate_spatial_grid(
         for y in y_coords:
             cell_box = box(x, y, x + cell_size_meters, y + cell_size_meters)
             if cell_box.intersects(aoi_shape):
-                cell_id = f"NLBC_CELL_{count:04d}"
+                cell_id = f"{AOI['cell_id_prefix']}_{count:04d}"
                 centroid_utm = cell_box.centroid
                 centroid_wgs = transform_geom(target_crs, "EPSG:4326", mapping(centroid_utm))
                 lon, lat = centroid_wgs["coordinates"]
@@ -142,7 +151,7 @@ def generate_spatial_grid(
         output_geojson.parent.mkdir(parents=True, exist_ok=True)
         geojson_doc = {
             "type": "FeatureCollection",
-            "name": "nira_command_area_grid_250m",
+            "name": AOI["grid_name"],
             "crs": {"type": "name", "properties": {"name": "urn:ogc:def:crs:OGC:1.3:CRS84"}},
             "features": features_wgs84,
         }
@@ -194,6 +203,11 @@ def read_and_resample_scl(
             resampling=Resampling.nearest,
         )
         return destination
+
+
+def remove_boa_offset(band: np.ndarray, offset: int = BOA_ADD_OFFSET) -> np.ndarray:
+    """Convert raw Sentinel-2 L2A values to surface reflectance scaled by 10,000."""
+    return np.clip(band.astype(np.float32) + offset, 0, None)
 
 
 def compute_spectral_indices(
@@ -311,11 +325,42 @@ def extract_grid_zonal_stats_fast(
     return records
 
 
+def compute_scene_records(
+    bands: Dict[str, np.ndarray],
+    raster_transform: rasterio.Affine,
+    raster_shape: Tuple[int, int],
+    acquisition_date: str,
+    scene_id: str,
+    grid_cells: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    """Calculate per-cell features from offset-corrected bands and the SCL layer."""
+    ndvi, ndwi, evi, valid_mask = compute_spectral_indices(
+        bands["B02"], bands["B04"], bands["B08"], bands["B11"], bands["SCL"]
+    )
+    return extract_grid_zonal_stats_fast(
+        grid_cells=grid_cells,
+        ndvi=ndvi,
+        ndwi=ndwi,
+        evi=evi,
+        b02=bands["B02"],
+        b03=bands["B03"],
+        b04=bands["B04"],
+        b08=bands["B08"],
+        b11=bands["B11"],
+        b12=bands["B12"],
+        valid_mask=valid_mask,
+        raster_transform=raster_transform,
+        raster_shape=raster_shape,
+        acquisition_date=acquisition_date,
+        scene_id=scene_id,
+    )
+
+
 def run_preprocessing_pipeline(
     satellite_dir: Optional[Path] = None,
     geojson_path: Optional[Path] = None,
     output_dir: Optional[Path] = None,
-    cell_size_meters: float = 250.0,
+    cell_size_meters: float = AOI["cell_size_m"],
     max_scenes: Optional[int] = None,
 ) -> Path:
     """Execute Phase 5 preprocessing with fast slicing and scene-level checkpointing."""
@@ -328,16 +373,16 @@ def run_preprocessing_pipeline(
         output_dir = base_dir / "data" / "processed"
 
     output_dir.mkdir(parents=True, exist_ok=True)
-    cache_dir = output_dir / "scene_cache"
+    cache_dir = output_dir / f"scene_cache_v{settings['satellite']['feature_version']}"
     cache_dir.mkdir(parents=True, exist_ok=True)
     grid_geojson_path = output_dir / "spatial_grid_250m.geojson"
 
     # Step 1: Load or generate 250m spatial grid
-    aoi_shape, aoi_bounds = load_and_project_aoi(geojson_path, target_crs="EPSG:32643")
+    aoi_shape, aoi_bounds = load_and_project_aoi(geojson_path, target_crs=AOI["crs"])
     grid_cells = generate_spatial_grid(
         aoi_shape=aoi_shape,
         bounds=aoi_bounds,
-        target_crs="EPSG:32643",
+        target_crs=AOI["crs"],
         cell_size_meters=cell_size_meters,
         output_geojson=grid_geojson_path,
     )
@@ -385,38 +430,16 @@ def run_preprocessing_pipeline(
                 target_shape = (ref.height, ref.width)
                 target_transform = ref.transform
 
-            with rasterio.open(b02_path) as src:
-                b02 = src.read(1).astype(np.float32)
-            with rasterio.open(b03_path) as src:
-                b03 = src.read(1).astype(np.float32)
-            with rasterio.open(b04_path) as src:
-                b04 = src.read(1).astype(np.float32)
-            with rasterio.open(b08_path) as src:
-                b08 = src.read(1).astype(np.float32)
+            bands: Dict[str, np.ndarray] = {}
+            for band_key, band_path in (("B02", b02_path), ("B03", b03_path), ("B04", b04_path), ("B08", b08_path)):
+                with rasterio.open(band_path) as src:
+                    bands[band_key] = remove_boa_offset(src.read(1))
 
-            b11 = read_and_resample_band(b11_path, target_shape, target_transform)
-            b12 = read_and_resample_band(b12_path, target_shape, target_transform)
-            scl = read_and_resample_scl(scl_path, target_shape, target_transform)
+            bands["B11"] = remove_boa_offset(read_and_resample_band(b11_path, target_shape, target_transform))
+            bands["B12"] = remove_boa_offset(read_and_resample_band(b12_path, target_shape, target_transform))
+            bands["SCL"] = read_and_resample_scl(scl_path, target_shape, target_transform)
 
-            ndvi, ndwi, evi, valid_mask = compute_spectral_indices(b02, b04, b08, b11, scl)
-
-            records = extract_grid_zonal_stats_fast(
-                grid_cells=grid_cells,
-                ndvi=ndvi,
-                ndwi=ndwi,
-                evi=evi,
-                b02=b02,
-                b03=b03,
-                b04=b04,
-                b08=b08,
-                b11=b11,
-                b12=b12,
-                valid_mask=valid_mask,
-                raster_transform=target_transform,
-                raster_shape=target_shape,
-                acquisition_date=acq_date,
-                scene_id=scene_id,
-            )
+            records = compute_scene_records(bands, target_transform, target_shape, acq_date, scene_id, grid_cells)
 
             if records:
                 scene_df = pd.DataFrame(records)
@@ -455,7 +478,7 @@ def run_preprocessing_pipeline(
 def parse_args() -> argparse.Namespace:
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(description="Preprocess Sentinel-2 bands and extract 250m grid features.")
-    parser.add_argument("--cell-size", type=float, default=250.0, help="Grid cell size in meters (default: 250)")
+    parser.add_argument("--cell-size", type=float, default=AOI["cell_size_m"], help="Grid cell size in meters")
     parser.add_argument("--max-scenes", type=int, default=None, help="Limit number of scenes to process for quick testing")
     return parser.parse_args()
 

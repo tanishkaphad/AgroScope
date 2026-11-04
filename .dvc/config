@@ -1,0 +1,5 @@
+[core]
+    remote = gdrive
+['remote "gdrive"']
+    url = gdrive://1Jc5UUVzaIhAIJKA977RFrlmr_EF7OIdv
+    gdrive_trash_only = true

@@ -25,6 +25,13 @@ from typing import Any, Dict, Optional
 import numpy as np
 import pandas as pd
 
+# Ensure project root is in sys.path
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from src.config import settings
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
@@ -32,49 +39,12 @@ logging.basicConfig(
 )
 logger = logging.getLogger("agroscope.target_generation")
 
-# FAO-56 Crop Coefficients for Dominant Crops in Nira Left Bank Canal (Rabi Season)
-CROP_KC_TABLE: Dict[str, Dict[str, float]] = {
-    "Wheat": {
-        "initial": 0.40,
-        "mid_season": 1.15,
-        "late_season": 0.35,
-        "season_average": 0.90,
-    },
-    "Sugarcane": {
-        "initial": 0.80,
-        "mid_season": 1.25,
-        "late_season": 0.75,
-        "season_average": 1.10,
-    },
-    "Gram_Chana": {
-        "initial": 0.40,
-        "mid_season": 1.00,
-        "late_season": 0.35,
-        "season_average": 0.75,
-    },
-    "Jowar": {
-        "initial": 0.35,
-        "mid_season": 1.05,
-        "late_season": 0.55,
-        "season_average": 0.80,
-    },
-    "Command_Area_Weighted": {
-        # Weighted by acreage in NLBC command area (Sugarcane ~40%, Wheat ~30%, Gram/Jowar ~30%)
-        "season_average": 0.95,
-    },
-}
-
-# FAO-56 Climatic Water Deficit (CWD) 8-day thresholds (mm)
-# Low Stress: Deficit < 12 mm
-# Moderate Stress: 12 mm <= Deficit <= 28 mm
-# High Stress: Deficit > 28 mm
-CWD_LOW_THRESHOLD = 12.0
-CWD_HIGH_THRESHOLD = 28.0
+LABELS = settings["labels"]
 
 
 def compute_climatic_water_deficit(
     weather_df: pd.DataFrame,
-    kc: float = 0.95,
+    kc: float = LABELS["default_kc"],
 ) -> pd.DataFrame:
     """Compute 8-day Climatic Water Deficit (CWD) and derive 3-class target labels."""
     df = weather_df.copy()
@@ -92,7 +62,7 @@ def compute_climatic_water_deficit(
 
     # USDA-SCS Effective Rainfall method (approximated for 8-day windows)
     # Light rainfall (< 5mm) mostly evaporates; effective fraction is ~80%
-    df["effective_rainfall_8day_mm"] = np.clip(df["rainfall_8day"] * 0.8, 0, df["crop_water_demand_8day_mm"]).round(2)
+    df["effective_rainfall_8day_mm"] = np.clip(df["rainfall_8day"] * LABELS["effective_rainfall_fraction"], 0, df["crop_water_demand_8day_mm"]).round(2)
 
     # Climatic Water Deficit (CWD) = Demand - Effective Rainfall
     df["water_deficit_8day_mm"] = np.maximum(
@@ -103,9 +73,9 @@ def compute_climatic_water_deficit(
     # Class 1: MODERATE STRESS (12 to 28 mm deficit)
     # Class 2: HIGH STRESS (> 28 mm deficit)
     conditions = [
-        df["water_deficit_8day_mm"] < CWD_LOW_THRESHOLD,
-        (df["water_deficit_8day_mm"] >= CWD_LOW_THRESHOLD) & (df["water_deficit_8day_mm"] <= CWD_HIGH_THRESHOLD),
-        df["water_deficit_8day_mm"] > CWD_HIGH_THRESHOLD,
+        df["water_deficit_8day_mm"] < LABELS["deficit_low_mm"],
+        (df["water_deficit_8day_mm"] >= LABELS["deficit_low_mm"]) & (df["water_deficit_8day_mm"] <= LABELS["deficit_high_mm"]),
+        df["water_deficit_8day_mm"] > LABELS["deficit_high_mm"],
     ]
     choices = [0, 1, 2]
     df["target_stress_class"] = np.select(conditions, choices, default=1).astype(int)
@@ -116,11 +86,23 @@ def compute_climatic_water_deficit(
     return df
 
 
+def assign_nearest_weather_points(cells: pd.DataFrame, points: pd.DataFrame) -> pd.DataFrame:
+    """Map each grid cell to its nearest weather point."""
+    # Scale longitude so distances are comparable at this latitude
+    lon_scale = np.cos(np.radians(points["latitude"].mean()))
+    cell_xy = np.column_stack([cells["centroid_lon"] * lon_scale, cells["centroid_lat"]])
+    point_xy = np.column_stack([points["longitude"] * lon_scale, points["latitude"]])
+
+    distances = np.linalg.norm(cell_xy[:, None, :] - point_xy[None, :, :], axis=2)
+    nearest = points["weather_point_id"].to_numpy()[distances.argmin(axis=1)]
+    return pd.DataFrame({"cell_id": cells["cell_id"].to_numpy(), "weather_point_id": nearest})
+
+
 def generate_target_dataset(
     weather_csv: Optional[Path] = None,
     satellite_features_csv: Optional[Path] = None,
     output_dir: Optional[Path] = None,
-    kc: float = 0.95,
+    kc: float = LABELS["default_kc"],
 ) -> Path:
     """Generate target labels and optionally merge with satellite grid features."""
     base_dir = Path(__file__).resolve().parent.parent.parent
@@ -158,6 +140,7 @@ def generate_target_dataset(
 
         # Select relevant weather and target columns to join
         weather_cols = [
+            "weather_point_id",
             "date",
             "temp_mean_c",
             "temp_max_c",
@@ -177,27 +160,36 @@ def generate_target_dataset(
         ]
         weather_subset = labeled_weather[[c for c in weather_cols if c in labeled_weather.columns]]
 
-        merged = pd.merge(sat_df, weather_subset, on="date", how="inner")
+        points = weather_df[["weather_point_id", "latitude", "longitude"]].drop_duplicates()
+        cells = sat_df[["cell_id", "centroid_lon", "centroid_lat"]].drop_duplicates("cell_id")
+        sat_df = sat_df.merge(assign_nearest_weather_points(cells, points), on="cell_id", how="left")
+
+        merged = pd.merge(sat_df, weather_subset, on=["weather_point_id", "date"], how="inner")
 
         # Scientific False-Alarm Filter:
         # If NDVI < 0.15, the cell is water, barren soil, or non-agricultural fallow.
         # Stressed crop prediction is only valid for cultivated/vegetated fields.
-        merged["is_vegetated"] = merged["ndvi_mean"] >= 0.15
+        merged["is_vegetated"] = merged["ndvi_mean"] >= LABELS["min_vegetated_ndvi"]
 
         # FAO-56 Root-Zone Canopy Water Balance (Field-Level Spatial Ground Truth):
         # Climatic demand provides atmospheric evaporative pull; Sentinel-2 NDWI reflects field canopy hydration.
         # Irrigated crops (NDWI >= 0.18) buffer evaporative demand through root-zone moisture.
         # Depleted crops (NDWI <= 0.02) have zero irrigation buffer and experience full climatic deficit.
-        canopy_irrigation_buffer = np.clip((merged["ndwi_mean"] - 0.02) / 0.16, 0.0, 1.0) * merged["crop_water_demand_8day_mm"] * 0.75
+        buffer_settings = LABELS["canopy_buffer"]
+        canopy_irrigation_buffer = (
+            np.clip((merged["ndwi_mean"] - buffer_settings["ndwi_dry"]) / buffer_settings["ndwi_range"], 0.0, 1.0)
+            * merged["crop_water_demand_8day_mm"]
+            * buffer_settings["max_fraction"]
+        )
         merged["water_deficit_8day_mm"] = np.maximum(
             0.0, merged["crop_water_demand_8day_mm"] - merged["effective_rainfall_8day_mm"] - canopy_irrigation_buffer
         ).round(2)
 
         # 3-Class Target Categorization
         conditions = [
-            merged["water_deficit_8day_mm"] < CWD_LOW_THRESHOLD,
-            (merged["water_deficit_8day_mm"] >= CWD_LOW_THRESHOLD) & (merged["water_deficit_8day_mm"] <= CWD_HIGH_THRESHOLD),
-            merged["water_deficit_8day_mm"] > CWD_HIGH_THRESHOLD,
+            merged["water_deficit_8day_mm"] < LABELS["deficit_low_mm"],
+            (merged["water_deficit_8day_mm"] >= LABELS["deficit_low_mm"]) & (merged["water_deficit_8day_mm"] <= LABELS["deficit_high_mm"]),
+            merged["water_deficit_8day_mm"] > LABELS["deficit_high_mm"],
         ]
         choices = [0, 1, 2]
         merged["target_stress_class"] = np.select(conditions, choices, default=1).astype(int)
@@ -225,7 +217,7 @@ def generate_target_dataset(
 def parse_args() -> argparse.Namespace:
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(description="Generate FAO-56 Climatic Water Deficit target labels.")
-    parser.add_argument("--kc", type=float, default=0.95, help="Crop coefficient (default: 0.95)")
+    parser.add_argument("--kc", type=float, default=LABELS["default_kc"], help="Crop coefficient")
     return parser.parse_args()
 
 

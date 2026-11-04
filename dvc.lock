@@ -8,15 +8,41 @@ stages:
       hash: md5
       md5: 26730ef4c334de04b89bf9295e79eb64
       size: 3031
+    - path: src/config.py
+      hash: md5
+      md5: f3ca1a5c428b072b7c9a5849020bbddc
+      size: 545
     - path: src/ingestion/fetch_weather.py
       hash: md5
-      md5: 9ae9e3090775e8b22de96a486a3bb746
-      size: 8662
+      md5: cd5e1925fab46649dc622a9dd6409cdc
+      size: 11354
+    params:
+      configs/settings.yaml:
+        weather:
+          archive_url: https://archive-api.open-meteo.com/v1/archive
+          forecast_url: https://api.open-meteo.com/v1/forecast
+          timezone: Asia/Kolkata
+          start_date: '2023-01-01'
+          end_date: '2024-05-31'
+          forecast_days: 7
+          grid_spacing_deg: 0.1
+          request_delay_s: 4.0
+          rate_limit_wait_s: 65
+          daily_variables:
+          - temperature_2m_max
+          - temperature_2m_min
+          - temperature_2m_mean
+          - precipitation_sum
+          - rain_sum
+          - relative_humidity_2m_mean
+          - wind_speed_10m_max
+          - shortwave_radiation_sum
+          - et0_fao_evapotranspiration
     outs:
     - path: data/raw/weather/daily_weather.csv
       hash: md5
-      md5: cf6655d0c15bdda14980cda123f48228
-      size: 68358
+      md5: 82558d511ab0d84387cbbb9b2e472ae7
+      size: 1645317
   preprocess_satellite:
     cmd: python src/preprocessing/preprocess_bands.py
     deps:
@@ -29,15 +55,38 @@ stages:
       hash: md5
       md5: 26730ef4c334de04b89bf9295e79eb64
       size: 3031
+    - path: src/config.py
+      hash: md5
+      md5: f3ca1a5c428b072b7c9a5849020bbddc
+      size: 545
     - path: src/preprocessing/preprocess_bands.py
       hash: md5
-      md5: 1a848bda8de3dc2e09fadbc24fbe36ba
-      size: 19017
+      md5: 99bbd9ea1b94d8b0e76f2d9e3c96b7fb
+      size: 20003
+    params:
+      configs/settings.yaml:
+        aoi:
+          id: AOI_NLBC_PUNE
+          crs: EPSG:32643
+          cell_size_m: 250.0
+          cell_area_ha: 6.25
+          cell_id_prefix: NLBC_CELL
+          grid_name: nira_command_area_grid_250m
+          default_mgrs_tiles:
+          - 43QDA
+          - 43QDV
+        satellite.boa_add_offset: -1000
+        satellite.feature_version: 2
+        satellite.valid_scl_classes:
+        - 4
+        - 5
+        - 6
+        - 7
     outs:
     - path: data/processed/satellite_grid_features.csv
       hash: md5
-      md5: 70f740ce5ad2a11ce15d9f8a7c365e91
-      size: 114738717
+      md5: 659ed826e9c7fd671b092251883e1f41
+      size: 113297028
     - path: data/processed/spatial_grid_250m.geojson
       hash: md5
       md5: cd0421d94562cbca2699816601559e53
@@ -47,94 +96,187 @@ stages:
     deps:
     - path: data/processed/satellite_grid_features.csv
       hash: md5
-      md5: 70f740ce5ad2a11ce15d9f8a7c365e91
-      size: 114738717
+      md5: 659ed826e9c7fd671b092251883e1f41
+      size: 113297028
     - path: data/raw/weather/daily_weather.csv
       hash: md5
-      md5: cf6655d0c15bdda14980cda123f48228
-      size: 68358
+      md5: 82558d511ab0d84387cbbb9b2e472ae7
+      size: 1645317
+    - path: src/config.py
+      hash: md5
+      md5: f3ca1a5c428b072b7c9a5849020bbddc
+      size: 545
     - path: src/target/generate_labels.py
       hash: md5
-      md5: 44f3961218f4b401a8967cf49aa87cab
-      size: 9440
+      md5: 1293092d66a8ba323cab6d3ab298c214
+      size: 9990
+    params:
+      configs/settings.yaml:
+        labels:
+          default_kc: 0.95
+          effective_rainfall_fraction: 0.8
+          min_vegetated_ndvi: 0.15
+          deficit_low_mm: 12.0
+          deficit_high_mm: 28.0
+          canopy_buffer:
+            ndwi_dry: 0.02
+            ndwi_range: 0.16
+            max_fraction: 0.75
+          crop_kc:
+            Wheat:
+              initial: 0.4
+              mid_season: 1.15
+              late_season: 0.35
+              season_average: 0.9
+            Sugarcane:
+              initial: 0.8
+              mid_season: 1.25
+              late_season: 0.75
+              season_average: 1.1
+            Gram_Chana:
+              initial: 0.4
+              mid_season: 1.0
+              late_season: 0.35
+              season_average: 0.75
+            Jowar:
+              initial: 0.35
+              mid_season: 1.05
+              late_season: 0.55
+              season_average: 0.8
     outs:
     - path: data/features/features.csv
       hash: md5
-      md5: 083ac4ebe2f5d3171ed2664102837e4d
-      size: 165728762
+      md5: b748fefb34c9d8c21f42ea57314fb167
+      size: 168385058
     - path: data/processed/target_labels.csv
       hash: md5
-      md5: dd4bd265f857deb48ab487b1b65daa29
-      size: 80724
+      md5: 9d6058a4774f4e5802f1c29564f5971b
+      size: 1938396
   train_evaluate:
     cmd: python src/training/train.py
     deps:
     - path: data/features/features.csv
       hash: md5
-      md5: 083ac4ebe2f5d3171ed2664102837e4d
-      size: 165728762
+      md5: b748fefb34c9d8c21f42ea57314fb167
+      size: 168385058
+    - path: src/config.py
+      hash: md5
+      md5: f3ca1a5c428b072b7c9a5849020bbddc
+      size: 545
     - path: src/training/train.py
       hash: md5
-      md5: 890b61e0f729fd114f7f3d9978310de0
-      size: 17689
+      md5: 8a649d87232593e03aeecce9032a7f96
+      size: 17746
+    params:
+      configs/settings.yaml:
+        training:
+          target_column: target_stress_class
+          temporal_split_date: '2024-02-01'
+          spatial_test_size: 0.25
+          random_state: 42
+          features:
+          - ndvi_mean
+          - ndvi_std
+          - ndwi_mean
+          - ndwi_std
+          - evi_mean
+          - evi_std
+          - b02_mean
+          - b03_mean
+          - b04_mean
+          - b08_mean
+          - b11_mean
+          - b12_mean
+          - temp_mean_c
+          - temp_max_c
+          - humidity_pct
+          - wind_speed_mps
+          - solar_radiation_mj
+          - rainfall_8day
+          - rainfall_16day
+          - rainfall_30day
+          - temp_8day_mean
+          - temp_30day_mean
+          - temp_8day_max
+          - et0_8day_sum
+          - et0_16day_sum
+          random_forest:
+            n_estimators: 100
+            max_depth: 12
+          xgboost:
+            n_estimators: 150
+            max_depth: 6
+            learning_rate: 0.08
+            subsample: 0.8
+            colsample_bytree: 0.8
     outs:
     - path: models/baseline_random_forest.pkl
       hash: md5
-      md5: 7dbfb12f98897efd494dc29899dd2b64
-      size: 13634317
+      md5: e24379d6417c41787f9b79111595275a
+      size: 25731242
     - path: models/feature_metadata.json
       hash: md5
-      md5: a5d06da061c10025050ab71c0fea3c53
-      size: 4728
+      md5: 2e59af990b995a5953698f8e2a825d3f
+      size: 4730
     - path: models/xgboost_model.json
       hash: md5
-      md5: 3c4b6a753e7e1c5a2aeadd76a920a2bc
-      size: 1772912
+      md5: 4d0a663eb00581894f76830e729bfe2d
+      size: 2636644
     - path: models/xgboost_model.pkl
       hash: md5
-      md5: 28b6b695cfed277b254725367a00d385
-      size: 1240668
+      md5: 4ba0790b6da96c4f93dd5c8a616c71e4
+      size: 1743158
   predict_cycle:
     cmd: python src/inference/predict.py
     deps:
     - path: data/features/features.csv
       hash: md5
-      md5: 083ac4ebe2f5d3171ed2664102837e4d
-      size: 165728762
+      md5: b748fefb34c9d8c21f42ea57314fb167
+      size: 168385058
     - path: data/processed/spatial_grid_250m.geojson
       hash: md5
       md5: cd0421d94562cbca2699816601559e53
       size: 18635716
     - path: models/feature_metadata.json
       hash: md5
-      md5: a5d06da061c10025050ab71c0fea3c53
-      size: 4728
+      md5: 2e59af990b995a5953698f8e2a825d3f
+      size: 4730
     - path: models/xgboost_model.pkl
       hash: md5
-      md5: 28b6b695cfed277b254725367a00d385
-      size: 1240668
+      md5: 4ba0790b6da96c4f93dd5c8a616c71e4
+      size: 1743158
     - path: src/advisory/advisory_engine.py
       hash: md5
       md5: 58ab0c08f541aad5f766d24cbcb07d87
       size: 16632
+    - path: src/config.py
+      hash: md5
+      md5: f3ca1a5c428b072b7c9a5849020bbddc
+      size: 545
     - path: src/inference/explainability.py
       hash: md5
       md5: f1e9a6ef66b5f879681a660855e3731e
       size: 10723
     - path: src/inference/predict.py
       hash: md5
-      md5: 88bc40d94941091fdd8bf11dee7f8f8b
-      size: 20659
+      md5: ce8fe5bdefb90f38c44b3cecb024f7fd
+      size: 20757
+    params:
+      configs/settings.yaml:
+        aoi.cell_area_ha: 6.25
+        inference:
+          min_latest_coverage: 0.9
+        labels.min_vegetated_ndvi: 0.15
     outs:
     - path: data/processed/cycle_statistics.json
       hash: md5
-      md5: 3e47630ac5d95ff3b95d8c7218b25f82
-      size: 734
+      md5: 535da02a15a819f6ae0f7308ea5ff0b8
+      size: 740
     - path: data/processed/irrigation_map.geojson
       hash: md5
-      md5: a771f2d99b21eab38e4a428d02a044cd
-      size: 79631373
+      md5: 806b579523bcbd3c86cea75cfb9e840c
+      size: 109254185
     - path: data/processed/stress_map.geojson
       hash: md5
-      md5: e047cd7c7ad02efc36c8c399d8919d3e
-      size: 6159930
+      md5: 5cd377301e76568bbb1e3a45b19d0ba5
+      size: 8541110
